@@ -55,9 +55,20 @@ Running log of phase status. Newest entries at the top of each section.
   **Compatible** against IU-261.27258.48, IU-262.11879.100 and IU-263.7307.200, verifier job
   green. Remaining reports are deprecated / experimental API usages (Eel, `writeCommandAction`,
   `GradleUtil.findGradleModuleData`), which do not fail the build.
-- Building on a corporate network: `-PplatformLocalPath=<installed IDE>` compiles against a local
-  IntelliJ (2026.1+) when JetBrains' download hosts are blocked; searchable options are skipped in
-  that mode. Added 2026-11-10 for the WSL build at the user's workplace.
+- Building on a corporate network (2026-11-10, user's workplace, WSL Ubuntu 24.04 + Windows
+  IntelliJ 2026.3): `-PplatformLocalPath=<installed IDE>` compiles against a local IntelliJ when the
+  web filter blocks JetBrains' hosts (classified "Generative AI"). Findings, all fixed on `main`:
+  corporate root CA must be imported into the WSL JDK cacerts; `gradlew` arrived CRLF
+  (`.gitattributes` now pins LF); the IDE install folder keeps its original name after in-place
+  updates (a folder named 2025.2.4 held build 263); scanning the IDE over `/mnt/c` takes
+  10-20 min (copying it into the Linux FS is faster); searchable options and code instrumentation
+  are excluded in local mode (IDE not launchable from WSL, `java-compiler-ant-tasks` blocked);
+  the daemon needs more than 512 MiB (`org.gradle.jvmargs` set); 2026.3 bundles Kotlin 2.4
+  metadata (compiler moved to 2.4.21, apiVersion pinned 2.2) and Java 25 class files
+  (`-PbuildJdk=25`, output still Java 21); `MavenProjectsTree.Listener.projectResolved(Pair)` no
+  longer exists on 2026.3 (overridden without `@Override`).
+- **Real-world check (2026-11-10 night):** plugin built against 2026.3 installed in the user's
+  work IntelliJ 2026.3; native formatting works on a corporate Maven project ("It works!").
 - Windows paths (parity ran on macOS only).
 
 ## Phase 5 — what was done (2026-11-10)
