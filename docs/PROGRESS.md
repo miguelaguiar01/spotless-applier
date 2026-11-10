@@ -6,14 +6,47 @@ Running log of phase status. Newest entries at the top of each section.
 
 | Phase | Title                                   | Status      |
 |-------|-----------------------------------------|-------------|
-| 0     | Recon and design                        | **done, awaiting checkpoint confirmation** |
-| 1     | Worker skeleton and IPC                 | not started |
+| 0     | Recon and design                        | done (checkpoint confirmed 2026-11-10) |
+| 1     | Worker skeleton and IPC                 | **done** |
 | 2     | Maven config extraction (IDE side)      | not started |
 | 3     | Worker, Maven mode (core + parity)      | not started |
 | 4     | IDE integration                         | not started |
 | 5     | Gradle support                          | not started |
 | 6     | Fallback path hardening                 | not started |
 | 7     | Polish and release                      | not started |
+
+## Phase 1 — what was done (2026-11-10)
+
+- Gradle multi-project scaffold: root plugin (Kotlin, IPGP 2.10.5, platform
+  2026.1), `protocol` (Java 17, zero deps) and `worker` (Java 17, depends on
+  protocol only). Worker jars are copied to `lib/worker/` by every
+  `PrepareSandboxTask` and end up in the distribution zip there (verified);
+  they are not on the plugin classloader (ADR-015).
+- `protocol`: hand-written JSON, 4-byte length-prefixed frames, typed
+  `Message` records (`hello`, `ping/pong`, `loadConfig/configLoaded`,
+  `format/formatResult`, `cancel`, `invalidate`, `ack`, `error`, `log`,
+  `shutdown`), `SpotlessConfig` DTO with SHA-256 `configId`. 7 unit tests.
+- `worker`: `WorkerMain` captures `FileDescriptor.in/out` first, replaces
+  `System.out/err` with non-closable line-forwarding streams, nulls
+  `System.in`; `WorkerServer` dispatches on a reader thread, formats on a
+  pool, supports cancel, idle timeout (`--idle-timeout-ms`), exits on stdin
+  EOF, `halt()`s at the end so stuck formatter threads cannot keep it alive.
+  `BuiltinTestEngine` provides trivial steps and deliberate misbehavior.
+  8 integration tests spawn a real JVM, including "formatter prints to and
+  closes System.out, channel still works".
+- IDE side: `SpotlessApplierSettings` (complete state, UI later),
+  `WorkerJdkResolver` (settings → Maven runner JRE → Gradle JVM → project
+  SDK → IDE runtime, version-checked via `JdkVersionDetector`),
+  `WorkerLauncher` (JVM flags per ADR-014, `-cp` over `lib/worker/*.jar`,
+  override property `spotless.applier.worker.dir`), `WorkerConnection`
+  (reader thread, pending-request map, cancellation → `cancel` frame,
+  death propagation), `WorkerManager` project service (lazy start,
+  handshake, restart with backoff: 3 failures → 1 min cooldown, configs
+  re-sent after restart, graceful shutdown on dispose, worker logs under
+  `#com.github.miguelaguiar01.spotless.worker`). 3 platform tests.
+- Not done / deferred: periodic health ping (request timeouts + process exit
+  detection cover it for now), Eel/remote spawning (Phase 6), `runIde`
+  manual check (headless session; sandbox layout verified on disk instead).
 
 ## Phase 0 — what was done (2026-11-10)
 
@@ -83,12 +116,13 @@ Running log of phase status. Newest entries at the top of each section.
   blocked; we pass explicit `--add-opens/--add-exports` (ADR-014). Needs a
   test on the bundled JBR 25.
 
-## Next steps (Phase 1, pending confirmation)
+## Next steps (Phase 2)
 
-- Scaffold the multi-project Gradle build (`protocol`, `worker`, root plugin)
-  from the original's working configuration.
-- Implement `WorkerMain` with stdio capture, framing, `hello/ping/format/shutdown`,
-  a hardcoded trim-trailing-whitespace step, and the integration test that
-  survives `System.out.close()`.
-- Implement `WorkerManager` in the plugin with lifecycle, JDK selection,
-  logging to `idea.log`.
+- `MavenConfigExtractor`: find `spotless-maven-plugin` in the module's
+  `MavenProject`, merge plugin-level config with `default-cli`, capture
+  properties, source roots, repositories, settings and local repo into
+  `SpotlessConfig`.
+- Settle the interpolation question with a fixture (see risks).
+- Invalidate on `MavenImportListener.importFinished` / POM changes.
+- Light tests with fixture POMs (single module, parent config,
+  pluginManagement, placeholders).

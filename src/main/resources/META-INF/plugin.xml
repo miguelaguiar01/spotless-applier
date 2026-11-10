@@ -1,0 +1,17 @@
+<!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
+<idea-plugin>
+    <id>com.github.miguelaguiar01.spotless-applier-native</id>
+    <name>Spotless Applier Native</name>
+    <vendor email="miguel.aguiar.01@gmail.com" url="https://github.com/miguelaguiar01">Miguel d'Aguiar</vendor>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.java</depends>
+    <depends>org.jetbrains.idea.maven</depends>
+    <depends>com.intellij.gradle</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <notificationGroup displayType="BALLOON" id="Spotless Applier Native"/>
+        <applicationService
+                serviceImplementation="com.github.miguelaguiar01.spotless.settings.SpotlessApplierSettings"/>
+    </extensions>
+</idea-plugin>

@@ -1,7 +1,9 @@
 # Decisions (ADR log)
 
-Format: one entry per decision. Status is `proposed` until the Phase 0
-checkpoint is confirmed, then `accepted`, later possibly `superseded`.
+Format: one entry per decision. Status is `proposed` until confirmed at a
+checkpoint, then `accepted`, later possibly `superseded`. ADR-001..014 were
+accepted at the Phase 0 checkpoint on 2026-11-10 (ADR-003 conditionally: the
+previous majors stay supported only if the parity corpus proves them).
 "Verified against" lists the exact versions a claim was checked on.
 
 ---
@@ -18,7 +20,7 @@ are carried over.
 
 ## ADR-002: New plugin id and name
 
-Status: proposed
+Status: accepted (checkpoint 2026-11-10)
 
 Plugin id `com.github.miguelaguiar01.spotless-applier-native` (group
 `com.github.miguelaguiar01`), display name **"Spotless Applier Native"**.
@@ -28,7 +30,7 @@ confirm or propose another at the checkpoint.
 
 ## ADR-003: Supported Spotless versions
 
-Status: proposed
+Status: accepted (checkpoint 2026-11-10)
 
 | Artifact                 | Current major (verified) | Previous major (verified) | Note |
 |--------------------------|--------------------------|---------------------------|------|
@@ -103,7 +105,7 @@ Differs / missing from the brief:
 
 ## ADR-005: Reuse Plexus to turn XML into Spotless config objects
 
-Status: proposed, verified against `org.eclipse.sisu.plexus` 1.1.2 sources
+Status: accepted (checkpoint 2026-11-10), verified against `org.eclipse.sisu.plexus` 1.1.2 sources
 
 `org.eclipse.sisu.plexus.CompositeBeanHelper.setProperty` looks for
 `set<Name>` then `add<Name>` then a field — which is how
@@ -121,7 +123,7 @@ Dependencies added to the worker only: `org.eclipse.sisu.plexus`,
 
 ## ADR-006: Which configuration applies — mirror `mvn spotless:apply`
 
-Status: proposed
+Status: accepted (checkpoint 2026-11-10)
 
 The parity target is the CLI invocation `mvn spotless:apply`, which uses the
 plugin-level `<configuration>` merged with the `default-cli` execution (if
@@ -141,7 +143,7 @@ produce a less complete model before resolution finishes).
 
 ## ADR-007: Artifact resolution in the worker
 
-Status: proposed
+Status: accepted (checkpoint 2026-11-10)
 
 Use `org.apache.maven.resolver:maven-resolver-supplier-mvn3:2.0.25`
 (`RepositorySystemSupplier`, `SessionBuilderSupplier`) with
@@ -155,7 +157,7 @@ is out of scope for v1. The resolved classpath for
 
 ## ADR-008: Worker transport is captured stdio, not sockets
 
-Status: proposed
+Status: accepted (checkpoint 2026-11-10)
 
 `FileDescriptor.in/out` are wrapped **before** any Spotless class loads;
 `System.out/err` are replaced by non-closable streams forwarding to the log.
@@ -170,7 +172,7 @@ becomes a bottleneck (it won't for source files).
 
 ## ADR-009: Line endings and `CLEAN` detection
 
-Status: proposed
+Status: accepted (checkpoint 2026-11-10)
 
 The IDE sends Unix text; the worker converts with the configured
 `LineEnding.Policy` and runs `DirtyState.of(formatter, file, bytes)` exactly
@@ -185,18 +187,20 @@ that would *change* the file's line separator (e.g. `WINDOWS` on an LF file)
 `LoadTextUtil.changeLineSeparators` only in the batch/on-disk path, and log
 in the document path.
 
-## ADR-010: Lints are warnings in the IDE
+## ADR-010: Lints do not block formatting; shown as errors
 
-Status: proposed
+Status: accepted (checkpoint 2026-11-10)
 
-`spotless:apply` throws after formatting when unsuppressed lints exist. The
-IDE applies the formatted text and shows lints as a warning notification
-(step name, line, message). The user can still see the build fail in CI as
-intended; blocking the editor on lints is not useful.
+`spotless:apply` writes the formatted file and *then* fails the build when
+unsuppressed lints exist, so the file is formatted either way. The IDE
+mirrors that: it applies the formatted text and shows lints as an
+**error-level** notification (step name, line, message). Blocking the
+editor would diverge from what the command line does to the file. Revisit
+if users ask for a "block on lints" option.
 
 ## ADR-011: ratchetFrom, license-header years, remote projects (v1 scope)
 
-Status: proposed
+Status: accepted (checkpoint 2026-11-10)
 
 - `ratchetFrom`: affects (a) which files are targets (only files dirty vs.
   the ref) and (b) license-header year mode. v1 implements (b) natively
@@ -268,7 +272,7 @@ Status: accepted (fact), verified against `JetBrains/intellij-community` branch 
 
 ## ADR-014: Worker JVM flags
 
-Status: proposed
+Status: accepted (checkpoint 2026-11-10)
 
 Spotless opens `jdk.compiler` packages itself at runtime
 (`ModuleHelper.doOpenInternalPackagesIfRequired`, used by google-java-format,
@@ -279,3 +283,24 @@ palantir and cleanthat) via `Unsafe` + `IMPL_LOOKUP`; its own test JVMs add
 so formatting works even where the reflective hack is blocked (JDK 25+
 tightens `Unsafe`). Also `-Xss` default, `-Xmx` from a setting (default 1g),
 `-Dfile.encoding=UTF-8`, `-Djava.awt.headless=true`.
+
+## ADR-015: Worker jars live in `lib/worker/`, outside the plugin classloader
+
+Status: accepted
+
+IntelliJ loads only the jars directly under a plugin's `lib/` directory.
+The worker and its dependencies (Maven Resolver, Sisu-Plexus, …) are copied
+to `lib/worker/` by `prepareSandbox`, so none of them are visible to the IDE
+classloader; the plugin only needs the small `protocol` jar. The worker is
+launched with an explicit `-cp` listing every jar in that directory.
+
+## ADR-016: Zero-dependency protocol module, hand-written JSON
+
+Status: accepted
+
+`protocol` is plain Java 17 with no dependencies (a ~300-line JSON
+reader/writer). Reason: it is shared by the IDE plugin and the worker, must
+not pull Gson/Jackson into the worker (which later hosts arbitrary Spotless
+classpaths), and the messages are small. Java records give typed messages;
+`SpotlessConfig.configId()` is the SHA-256 of the canonical (sorted-key)
+JSON.
