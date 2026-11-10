@@ -15,6 +15,11 @@ repositories {
     }
 }
 
+java {
+    // See the root build script: -PbuildJdk=25 when compiling against IntelliJ 2026.3+.
+    toolchain.languageVersion = JavaLanguageVersion.of(providers.gradleProperty("buildJdk").map(String::toInt).getOrElse(21))
+}
+
 tasks.withType<JavaCompile>().configureEach {
     // Runs inside the user's Gradle daemon during IDE sync; keep the bytecode level conservative.
     options.release = 11

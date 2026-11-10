@@ -14,9 +14,15 @@ plugins {
 group = providers.gradleProperty("pluginGroup").get()
 version = providers.gradleProperty("pluginVersion").get()
 
+// JDK that runs the compilers. Bytecode stays at Java 21 regardless (release / jvmTarget below).
+// IntelliJ 2026.3+ ships Java 25 class files, which javac 21 cannot read: when compiling against
+// such an IDE (-PplatformLocalPath), pass -PbuildJdk=25 and have a JDK 25 installed.
+val buildJdk: Int = providers.gradleProperty("buildJdk").map(String::toInt).getOrElse(21)
+
 kotlin {
-    jvmToolchain(21)
+    jvmToolchain(buildJdk)
     compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
         // The IDE's bundled stdlib is used at runtime (kotlin.stdlib.default.dependency=false).
         // Pin the API level so compiling with a newer compiler cannot leak stdlib calls that the
         // oldest supported IDE (2026.1) does not have.
@@ -153,6 +159,11 @@ tasks {
 
     publishPlugin {
         dependsOn("patchChangelog")
+    }
+
+    withType<JavaCompile>().configureEach {
+        options.release = 21
+        options.encoding = "UTF-8"
     }
 
     withType<PrepareSandboxTask>().configureEach {

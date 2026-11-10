@@ -119,6 +119,9 @@ newer) instead; the plugin is still built for 2026.1+:
 ```
 
 Maven Central and plugins.gradle.org must still be reachable (Kotlin, Gradle plugins, worker deps).
+IntelliJ 2026.3 and newer ship Java 25 class files, which javac 21 cannot read: install a JDK 25
+and add `-PbuildJdk=25` (the plugin is still compiled to Java 21 bytecode). If Gradle does not
+auto-detect that JDK, add `-Porg.gradle.java.installations.paths=/path/to/jdk-25`.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/DECISIONS.md](docs/DECISIONS.md),
 [docs/BENCHMARKS.md](docs/BENCHMARKS.md) and [docs/PROGRESS.md](docs/PROGRESS.md).
