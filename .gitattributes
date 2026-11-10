@@ -1,0 +1,12 @@
+# Normalise line endings so clones on Windows (core.autocrlf=true) cannot break shell scripts.
+* text=auto
+
+# Shell scripts must stay LF; batch files must stay CRLF.
+gradlew text eol=lf
+*.sh text eol=lf
+*.bat text eol=crlf
+
+# Never touch binaries.
+*.jar binary
+*.zip binary
+*.png binary
