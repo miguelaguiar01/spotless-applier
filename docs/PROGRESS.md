@@ -18,7 +18,7 @@ Running log of phase status. Newest entries at the top of each section.
 ## Phase 7 — what was done (2026-11-10)
 
 - `docs/BENCHMARKS.md` from `MavenBenchmarkTest` (p50 29 ms native vs 4.4 s build tool).
-- README (how it works, settings, fallback reasons, troubleshooting), CHANGELOG 2.0.0,
+- README (how it works, settings, fallback reasons, troubleshooting), CHANGELOG 0.1.0,
   `.github/workflows/build.yml` (build + all tests incl. parity, plugin verifier job).
 - `verifyPluginStructure` passes locally; `verifyPlugin` (IDE matrix) left to CI because of the
   IDE downloads.
