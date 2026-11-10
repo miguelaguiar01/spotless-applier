@@ -49,9 +49,15 @@ Running log of phase status. Newest entries at the top of each section.
   IU-262.11879.100 and IU-263.7307.200. Compatible with 261; 262/263 reported one real
   compatibility problem (Kotlin-generated super-call stub for the removed two-argument
   `MavenProjectsTree.Listener.projectResolved`) and one internal-API use
-  (`PluginManagerCore.getPlugin`). Both fixed (ADR-021); remaining reports are deprecated /
-  experimental API usages (Eel, `writeCommandAction`, `GradleUtil.findGradleModuleData`), which
-  do not fail the build.
+  (`PluginManagerCore.getPlugin`, and its replacement `PluginManager.findEnabledPlugin` is
+  internal on 262+ as well; the worker dir is now derived from the plugin jar via
+  `PathManager.getJarPathForClass`). Both fixed (ADR-021). CI run 42898464393 (commit 61eb3d3):
+  **Compatible** against IU-261.27258.48, IU-262.11879.100 and IU-263.7307.200, verifier job
+  green. Remaining reports are deprecated / experimental API usages (Eel, `writeCommandAction`,
+  `GradleUtil.findGradleModuleData`), which do not fail the build.
+- Building on a corporate network: `-PplatformLocalPath=<installed IDE>` compiles against a local
+  IntelliJ (2026.1+) when JetBrains' download hosts are blocked; searchable options are skipped in
+  that mode. Added 2026-11-10 for the WSL build at the user's workplace.
 - Windows paths (parity ran on macOS only).
 
 ## Phase 5 — what was done (2026-11-10)
