@@ -96,11 +96,18 @@ is not set; lints (Spotless 3.x) are shown as an error notification but formatti
 
 ## Building
 
+Requirements: a JDK 21 installed locally (the build uses a Gradle toolchain but does not
+auto-download one; set `JAVA_HOME` to it or make sure Gradle can find it), and network access to
+Maven Central and JetBrains' repositories (the first build downloads IntelliJ 2026.1, about 1.5 GB).
+
 ```
+./gradlew buildPlugin    # -> build/distributions/spotless-applier-<version>.zip (no tests)
 ./gradlew build          # all tests except the parity corpus need no network
 ./gradlew :worker:test   # parity: runs real Maven/Gradle on fixtures/ (downloads formatters)
-./gradlew runIde
+./gradlew runIde         # sandbox IDE with the plugin installed
 ```
+
+Install the zip with Settings | Plugins | ⚙ | Install Plugin from Disk… (IntelliJ 2026.1+).
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/DECISIONS.md](docs/DECISIONS.md),
 [docs/BENCHMARKS.md](docs/BENCHMARKS.md) and [docs/PROGRESS.md](docs/PROGRESS.md).
