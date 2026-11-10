@@ -64,9 +64,17 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
 }
 
+if (providers.gradleProperty("platformLocalPath").isPresent) {
+    // The searchable-options tasks launch the IDE and derive their classpath from the IDE's
+    // product-info.json launch section for the *current* OS. A Windows installation used from WSL
+    // has none, and even a disabled task gets serialized into the configuration cache, so take the
+    // tasks out of the graph altogether. Searchable options only index the settings page.
+    gradle.startParameter.excludedTaskNames.addAll(
+        listOf("buildSearchableOptions", "prepareJarSearchableOptions", "jarSearchableOptions"),
+    )
+}
+
 intellijPlatform {
-    // Needs to launch the IDE; a Windows installation used from WSL cannot be launched, so skip it
-    // when building against a local IDE. Searchable options only index the settings page.
     buildSearchableOptions = !providers.gradleProperty("platformLocalPath").isPresent
     // Instrumentation (@NotNull assertions, GUI forms; this plugin has no forms) downloads
     // java-compiler-ant-tasks from JetBrains' repository, which such networks block as well.
