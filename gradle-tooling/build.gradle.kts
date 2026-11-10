@@ -32,7 +32,8 @@ configurations.matching { it.name.startsWith("test") }.configureEach {
 dependencies {
     // Gradle API + IntelliJ's tooling-extension API (ModelBuilderService) come from the bundled Gradle plugin.
     intellijPlatform {
-        intellijIdea(providers.gradleProperty("platformVersion"))
+        val localIde = providers.gradleProperty("platformLocalPath")
+        if (localIde.isPresent) local(localIde) else intellijIdea(providers.gradleProperty("platformVersion"))
         bundledPlugin("com.intellij.gradle")
     }
 

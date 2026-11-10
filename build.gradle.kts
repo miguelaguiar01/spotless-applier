@@ -50,7 +50,10 @@ dependencies {
     workerAdapter(project(":worker-gradle-adapter"))
 
     intellijPlatform {
-        intellijIdea(providers.gradleProperty("platformVersion"))
+        // -PplatformLocalPath=<installed IDE> compiles against a local installation instead of
+        // downloading the platform (for networks that block JetBrains' download hosts).
+        val localIde = providers.gradleProperty("platformLocalPath")
+        if (localIde.isPresent) local(localIde) else intellijIdea(providers.gradleProperty("platformVersion"))
         bundledPlugins(providers.gradleProperty("platformBundledPlugins").map { it.split(',').filter(String::isNotBlank) })
         plugins(providers.gradleProperty("platformPlugins").map { it.split(',').filter(String::isNotBlank) })
         bundledModules(providers.gradleProperty("platformBundledModules").map { it.split(',').filter(String::isNotBlank) })
@@ -62,6 +65,10 @@ dependencies {
 }
 
 intellijPlatform {
+    // Needs to launch the IDE; a Windows installation used from WSL cannot be launched, so skip it
+    // when building against a local IDE. Searchable options only index the settings page.
+    buildSearchableOptions = !providers.gradleProperty("platformLocalPath").isPresent
+
     pluginConfiguration {
         name = providers.gradleProperty("pluginName")
         version = providers.gradleProperty("pluginVersion")

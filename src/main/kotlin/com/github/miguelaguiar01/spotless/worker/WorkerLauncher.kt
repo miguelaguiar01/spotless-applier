@@ -2,9 +2,7 @@ package com.github.miguelaguiar01.spotless.worker
 
 import com.github.miguelaguiar01.spotless.settings.SpotlessApplierSettings
 import com.intellij.execution.configurations.GeneralCommandLine
-import com.intellij.ide.plugins.PluginManager
 import com.intellij.openapi.application.PathManager
-import com.intellij.openapi.extensions.PluginId
 import java.io.File
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
@@ -43,11 +41,18 @@ object WorkerLauncher {
     /** Resolved-classpath cache, under the IDE system directory. */
     fun cacheDirectory(): Path = Path.of(PathManager.getSystemPath(), "spotless-applier-native")
 
+    /**
+     * `<plugin>/lib/worker`, located relative to this class's own jar (`<plugin>/lib/<plugin>.jar`).
+     * Deliberately avoids the plugin registry: `PluginManagerCore.getPlugin` and
+     * `PluginManager.findEnabledPlugin` are `@ApiStatus.Internal` on 2026.2+.
+     */
     fun workerDirectory(): Path {
         System.getProperty(WORKER_DIR_PROPERTY)?.let { return Path.of(it) }
-        val plugin = PluginManager.getInstance().findEnabledPlugin(PluginId.getId(PLUGIN_ID))
-            ?: throw IllegalStateException("Plugin $PLUGIN_ID not found")
-        return plugin.pluginPath.resolve("lib").resolve("worker")
+        val jar = PathManager.getJarPathForClass(WorkerLauncher::class.java)
+            ?: throw IllegalStateException("Cannot locate the plugin jar of $PLUGIN_ID")
+        val libDir = Path.of(jar).toAbsolutePath().parent
+            ?: throw IllegalStateException("Plugin jar $jar has no parent directory")
+        return libDir.resolve("worker")
     }
 
     fun workerClasspath(dir: Path = workerDirectory()): List<Path> {

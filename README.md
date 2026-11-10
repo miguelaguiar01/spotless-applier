@@ -109,6 +109,17 @@ Maven Central and JetBrains' repositories (the first build downloads IntelliJ 20
 
 Install the zip with Settings | Plugins | ⚙ | Install Plugin from Disk… (IntelliJ 2026.1+).
 
+If your network blocks JetBrains' download hosts, compile against an installed IDE (2026.1 or
+newer) instead; the plugin is still built for 2026.1+:
+
+```
+./gradlew buildPlugin -PplatformLocalPath="/path/to/IntelliJ IDEA"
+# WSL against the Windows install:
+./gradlew buildPlugin -PplatformLocalPath="/mnt/c/Program Files/JetBrains/IntelliJ IDEA 2026.3"
+```
+
+Maven Central and plugins.gradle.org must still be reachable (Kotlin, Gradle plugins, worker deps).
+
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/DECISIONS.md](docs/DECISIONS.md),
 [docs/BENCHMARKS.md](docs/BENCHMARKS.md) and [docs/PROGRESS.md](docs/PROGRESS.md).
 
