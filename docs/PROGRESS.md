@@ -31,9 +31,20 @@ Running log of phase status. Newest entries at the top of each section.
 4. File/project actions, on-save, optimize imports, Dev Containers — **yes** (Dev Containers via the build-tool path).
 5. Docs current — **yes**.
 
+### Manual `runIde` pass (2026-11-10, evening)
+- Maven: a throwaway project (`~/Github/spotless-maven-demo`, spotless-maven-plugin 3.11.0 with
+  google-java-format, license header, import order, toggleOffOn, sortPom and a custom `*.md` /
+  properties format) was opened in the sandbox IDE. File action, project action, on-save,
+  settings page and the build-tool fallback all worked as expected.
+- Follow-ups from the idea.log of that session: worker stderr lines were forwarded at WARN even
+  when slf4j printed them as INFO (fixed: the level in the line is honoured, blank lines dropped),
+  and the JVM printed `Picked up JAVA_TOOL_OPTIONS:` because the launcher blanked the variable
+  instead of removing it (fixed). Two "cannot execute background write action in 10 seconds"
+  warnings were checked against the thread dumps: the EDT was parked in platform modal dialogs,
+  not in plugin code.
+
 ### Not verified in this session
-- Interactive `runIde` session (headless environment): actions, settings UI and notifications are
-  compiled and unit/platform-tested, not clicked through.
+- Interactive `runIde` pass on a **Gradle** project (the Maven pass is above).
 - Plugin verifier against the recommended IDE matrix (CI job).
 - Windows paths (parity ran on macOS only).
 
@@ -271,6 +282,6 @@ content of every file in the other, and results must be byte-identical
 
 ## Next steps (after the checkpoint)
 
-- Manual `runIde` pass on a real Maven and a real Gradle project.
+- Manual `runIde` pass on a real Gradle project (Maven done 2026-11-10).
 - Worker inside Dev Containers through the Eel exec API.
 - Windows CI leg for the parity corpus.

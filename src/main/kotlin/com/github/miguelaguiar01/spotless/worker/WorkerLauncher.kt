@@ -72,6 +72,11 @@ object WorkerLauncher {
                 "--log-level=INFO",
                 "--cache-dir=${cacheDirectory()}",
             )
-            .withEnvironment("JAVA_TOOL_OPTIONS", "") // keep user JVM options from hijacking stdout
+            .also { cmd ->
+                // Keep user JVM options from hijacking stdout. Removing (not blanking) the variable also
+                // avoids the JVM's "Picked up JAVA_TOOL_OPTIONS:" banner on stderr.
+                cmd.environment.remove("JAVA_TOOL_OPTIONS")
+                cmd.environment.remove("_JAVA_OPTIONS")
+            }
     }
 }

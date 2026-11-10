@@ -5,6 +5,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /** Replaces {@code System.out/err/in} so user code cannot touch the protocol channel. */
 final class StdioGuard {
@@ -68,7 +70,31 @@ final class StdioGuard {
         private void emit() {
             String line = buf.toString(StandardCharsets.UTF_8);
             buf.reset();
-            log.log(level, "[" + prefix + "] " + line, null);
+            if (line.isBlank()) return;
+            log.log(levelOf(line, level), "[" + prefix + "] " + line, null);
         }
+
+        /**
+         * Formatter libraries log through slf4j-simple onto this stream as {@code [thread] LEVEL logger - msg}.
+         * Honour that level instead of flagging every stderr line as a warning.
+         */
+        static WorkerLog.Level levelOf(String line, WorkerLog.Level fallback) {
+            Matcher m = SLF4J_SIMPLE.matcher(line);
+            if (!m.find()) return fallback;
+            switch (m.group(1)) {
+                case "TRACE":
+                case "DEBUG":
+                    return WorkerLog.Level.DEBUG;
+                case "INFO":
+                    return WorkerLog.Level.INFO;
+                case "WARN":
+                    return WorkerLog.Level.WARN;
+                default:
+                    return WorkerLog.Level.ERROR;
+            }
+        }
+
+        private static final Pattern SLF4J_SIMPLE =
+                Pattern.compile("^(?:\\[[^\\]]*\\] )?(TRACE|DEBUG|INFO|WARN|ERROR) \\S+ - ");
     }
 }
