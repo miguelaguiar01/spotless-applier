@@ -396,3 +396,24 @@ Status: accepted (verified against spotless-plugin-gradle 8.11.0 and 7.0.4)
   anything else → `SPOTLESS_VERSION_UNSUPPORTED`.
 - Gradle sync completion (`ProjectDataImportListener`) drops cached Gradle
   configs and invalidates their worker formatters.
+
+## ADR-021: Platform listener interfaces with default methods are implemented in Java
+
+**Status:** accepted (2026-11-10, after the first plugin-verifier run)
+
+**Context.** `MavenProjectsTree.Listener` is a Kotlin interface compiled with JVM default
+methods. When a Kotlin `object` implements it, the Kotlin compiler emits a bridge stub for
+*every* default method of the interface, each doing `invokespecial` on the interface default.
+2026.2 removed the deprecated two-argument `projectResolved`, so the stub for it became an
+unresolved method and the verifier reported a `NoSuchMethodError` risk even though our source
+never mentioned that overload.
+
+**Decision.** Listeners for platform interfaces of this kind live in Java
+(`config/maven/MavenTreeListener.java`). A Java class only references the methods it overrides,
+so dropped defaults cannot break it. A bytecode audit (`javap` for
+`invokespecial ... InterfaceMethod com/intellij|org/jetbrains`) found no other Kotlin class with
+such stubs; the audit is cheap and should be repeated whenever a new platform listener is added.
+
+**Also.** `PluginManagerCore.getPlugin` is `@ApiStatus.Internal`; the worker directory lookup now
+uses `PluginManager.getInstance().findEnabledPlugin(id)`.
+

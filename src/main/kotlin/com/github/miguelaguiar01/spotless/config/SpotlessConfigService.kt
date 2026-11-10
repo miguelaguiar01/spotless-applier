@@ -2,6 +2,7 @@ package com.github.miguelaguiar01.spotless.config
 
 import com.github.miguelaguiar01.spotless.config.gradle.GradleSpotlessConfigExtractor
 import com.github.miguelaguiar01.spotless.config.maven.MavenSpotlessConfigExtractor
+import com.github.miguelaguiar01.spotless.config.maven.MavenTreeListener
 import com.github.miguelaguiar01.spotless.engine.ConfigLookup
 import com.github.miguelaguiar01.spotless.engine.FallbackReason
 import com.github.miguelaguiar01.spotless.worker.WorkerManager
@@ -15,16 +16,13 @@ import com.intellij.openapi.module.Module
 import com.intellij.openapi.module.ModuleUtilCore
 import org.jetbrains.plugins.gradle.util.GradleConstants
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.Pair
 import com.intellij.openapi.vfs.VirtualFile
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.jetbrains.idea.maven.project.MavenImportListener
 import org.jetbrains.idea.maven.project.MavenProject
-import org.jetbrains.idea.maven.project.MavenProjectChanges
 import org.jetbrains.idea.maven.project.MavenProjectsManager
-import org.jetbrains.idea.maven.project.MavenProjectsTree
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -120,20 +118,14 @@ class SpotlessConfigService(private val project: Project, private val scope: Cor
             if (listening) return
             listening = true
             val manager = MavenProjectsManager.getInstance(project)
-            manager.addProjectsTreeListener(object : MavenProjectsTree.Listener {
-                override fun projectsUpdated(updated: List<Pair<MavenProject, MavenProjectChanges>>, deleted: List<MavenProject>) {
-                    deleted.forEach { cache.remove(it.file.path) }
-                    refresh(updated.map { it.first })
-                }
-
-                override fun projectResolved(projectWithChanges: Pair<MavenProject, MavenProjectChanges>) {
-                    refresh(listOf(projectWithChanges.first))
-                }
-
-                override fun pluginsResolved(project: MavenProject) {
-                    refresh(listOf(project))
-                }
-            }, this)
+            // Java listener on purpose, see MavenTreeListener's class comment.
+            manager.addProjectsTreeListener(
+                MavenTreeListener(
+                    { changed -> refresh(changed) },
+                    { deleted -> deleted.forEach { cache.remove(it.file.path) } },
+                ),
+                this,
+            )
             project.messageBus.connect(this).subscribe(MavenImportListener.TOPIC, object : MavenImportListener {
                 override fun importFinished(importedProjects: Collection<MavenProject>, newModules: List<com.intellij.openapi.module.Module>) {
                     refresh(importedProjects)

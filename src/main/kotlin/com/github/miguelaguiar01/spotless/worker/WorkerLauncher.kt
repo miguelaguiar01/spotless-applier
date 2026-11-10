@@ -2,7 +2,7 @@ package com.github.miguelaguiar01.spotless.worker
 
 import com.github.miguelaguiar01.spotless.settings.SpotlessApplierSettings
 import com.intellij.execution.configurations.GeneralCommandLine
-import com.intellij.ide.plugins.PluginManagerCore
+import com.intellij.ide.plugins.PluginManager
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.extensions.PluginId
 import java.io.File
@@ -45,7 +45,7 @@ object WorkerLauncher {
 
     fun workerDirectory(): Path {
         System.getProperty(WORKER_DIR_PROPERTY)?.let { return Path.of(it) }
-        val plugin = PluginManagerCore.getPlugin(PluginId.getId(PLUGIN_ID))
+        val plugin = PluginManager.getInstance().findEnabledPlugin(PluginId.getId(PLUGIN_ID))
             ?: throw IllegalStateException("Plugin $PLUGIN_ID not found")
         return plugin.pluginPath.resolve("lib").resolve("worker")
     }

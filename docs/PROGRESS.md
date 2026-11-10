@@ -45,7 +45,13 @@ Running log of phase status. Newest entries at the top of each section.
 
 ### Not verified in this session
 - Interactive `runIde` pass on a **Gradle** project (the Maven pass is above).
-- Plugin verifier against the recommended IDE matrix (CI job).
+- Plugin verifier: first CI run (2026-11-10 evening) verified against IU-261.27258.48,
+  IU-262.11879.100 and IU-263.7307.200. Compatible with 261; 262/263 reported one real
+  compatibility problem (Kotlin-generated super-call stub for the removed two-argument
+  `MavenProjectsTree.Listener.projectResolved`) and one internal-API use
+  (`PluginManagerCore.getPlugin`). Both fixed (ADR-021); remaining reports are deprecated /
+  experimental API usages (Eel, `writeCommandAction`, `GradleUtil.findGradleModuleData`), which
+  do not fail the build.
 - Windows paths (parity ran on macOS only).
 
 ## Phase 5 — what was done (2026-11-10)
