@@ -317,3 +317,38 @@ Maven tests die with "Missing extension point". Both are declared as
 *optional* dependencies with empty config files so tests load them while the
 plugin keeps no hard requirement (every IDEA has them bundled anyway). The
 `MavenId` class lives in the reposearch plugin and is deliberately not used.
+
+## ADR-018: Adapter module compiled against the Spotless Maven plugin API
+
+Status: accepted
+
+Rather than driving Spotless through reflection, `worker-maven-adapter` is a
+small jar compiled with `compileOnly` dependencies on spotless-maven-plugin
+3.11.0 (plus lib, lib-extra, Maven/Resolver APIs). Nothing of Spotless is
+bundled: at runtime the adapter jar is loaded by the worker's child-first
+`SpotlessClassLoader` together with the user's resolved plugin classpath, so
+it links against *their* version. The boundary with the worker is the
+`MavenAdapter` SPI (parent-first package) whose signatures use only JDK,
+protocol, Maven-API and Resolver-API types. Version differences inside the
+supported range (2.44.x: 8-arg `FormatterConfig`, no `P2Provisioner`, no
+lints) are handled reflectively in the adapter. The adapter configures a real
+`SpotlessApplyMojo` instance with `BasicComponentConfigurator`, applies the
+descriptor's `default-value`s from the jar's `META-INF/maven/plugin.xml`, and
+reads the configured `FormatterFactory`s back by reflection.
+
+## ADR-019: Multiple matching formats and ratchetFrom in a long-lived process
+
+Status: accepted
+
+- A file matching several formats is formatted by each in the mojo's order
+  (`<formats>` first, then the language blocks in `getFormatterFactories()`
+  order), feeding each result into the next, which is what sequential
+  `process()` calls do on disk.
+- `ratchetFrom`: the build only targets files dirty relative to the ref.
+  Spotless's `GitRatchetMaven` caches the dirty set per JVM, which is wrong
+  in a worker that lives for hours, so the adapter creates a fresh
+  lib-extra `GitRatchet` per request and uses `isClean(baseDir, treeSha,
+  file)`; clean files are reported `CLEAN` without formatting. JGit failures
+  surface as `ERROR` for that file (the IDE then falls back).
+- Lints (3.x) are collected via `LintState.of(formatter, file, bytes)` with
+  `<lintSuppressions>` applied, and returned alongside the result (ADR-010).

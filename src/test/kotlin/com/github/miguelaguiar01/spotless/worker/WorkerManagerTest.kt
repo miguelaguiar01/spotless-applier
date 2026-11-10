@@ -36,7 +36,7 @@ class WorkerManagerTest : BasePlatformTestCase() {
 
     fun testUnsupportedKindReportsFallbackReason() = runBlocking {
         val manager = WorkerManager.getInstance(project)
-        val cfg = SpotlessConfig(SpotlessConfig.Kind.MAVEN, "3.11.0", project.basePath ?: "/tmp", null, null, emptyMap())
+        val cfg = SpotlessConfig(SpotlessConfig.Kind.GRADLE, "8.11.0", project.basePath ?: "/tmp", null, null, emptyMap())
         val loaded = manager.loadConfig(cfg)
         assertFalse(loaded.isOk)
         assertEquals("NOT_IMPLEMENTED", loaded.fallbackReason)

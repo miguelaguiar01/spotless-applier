@@ -28,17 +28,23 @@ public final class WorkerMain {
         StdioGuard.install(log);
 
         long idleTimeoutMs = 0;
+        String cacheDir = null;
+        String adapterDir = null;
         for (String arg : args) {
             if (arg.startsWith("--idle-timeout-ms=")) {
                 idleTimeoutMs = Long.parseLong(arg.substring("--idle-timeout-ms=".length()));
             } else if (arg.startsWith("--log-level=")) {
                 log.setLevel(WorkerLog.Level.valueOf(arg.substring("--log-level=".length()).toUpperCase()));
+            } else if (arg.startsWith("--cache-dir=")) {
+                cacheDir = arg.substring("--cache-dir=".length());
+            } else if (arg.startsWith("--adapter-dir=")) {
+                adapterDir = arg.substring("--adapter-dir=".length());
             }
         }
 
         int exitCode;
-        try {
-            WorkerServer server = new WorkerServer(protocolIn, protocolOut, log, idleTimeoutMs);
+        try (WorkerContext context = new WorkerContext(WorkerContext.pathArg(cacheDir), WorkerContext.pathArg(adapterDir), log)) {
+            WorkerServer server = new WorkerServer(protocolIn, protocolOut, log, idleTimeoutMs, context);
             exitCode = server.run();
         } catch (Throwable t) {
             // Last resort: the protocol channel may be gone; the parent sees the exit code.

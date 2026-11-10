@@ -33,9 +33,18 @@ val workerRuntime: Configuration by configurations.creating {
     isCanBeResolved = true
 }
 
+// Compiled against the Spotless Maven plugin API; loaded by the worker in the per-version child
+// classloader next to the user's Spotless jars. Lives in lib/worker/adapter/, off the worker's own -cp.
+val workerAdapter: Configuration by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+    isTransitive = false
+}
+
 dependencies {
     implementation(project(":protocol"))
     workerRuntime(project(":worker"))
+    workerAdapter(project(":worker-maven-adapter"))
 
     intellijPlatform {
         intellijIdea(providers.gradleProperty("platformVersion"))
@@ -124,11 +133,13 @@ tasks {
         from(workerRuntime) {
             into(pluginName.map { "$it/lib/worker" })
         }
+        from(workerAdapter) {
+            into(pluginName.map { "$it/lib/worker/adapter" })
+        }
     }
 
     test {
         // Let plugin-side tests find the worker jars without a sandbox.
-        dependsOn(workerRuntime)
         systemProperty("spotless.applier.worker.dir", layout.buildDirectory.dir("worker-classpath").get().asFile.absolutePath)
         dependsOn("copyWorkerClasspathForTests")
     }
@@ -136,5 +147,6 @@ tasks {
 
 val copyWorkerClasspathForTests by tasks.registering(Sync::class) {
     from(workerRuntime)
+    from(workerAdapter) { into("adapter") }
     into(layout.buildDirectory.dir("worker-classpath"))
 }

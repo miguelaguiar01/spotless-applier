@@ -31,6 +31,7 @@ final class WorkerServer {
     private final FrameCodec.Writer out;
     private final WorkerLog log;
     private final long idleTimeoutMs;
+    private final WorkerContext context;
 
     private final Map<String, FormatEngine> engines = new ConcurrentHashMap<>();
     private final Map<String, Future<?>> inFlight = new ConcurrentHashMap<>();
@@ -49,11 +50,12 @@ final class WorkerServer {
     private volatile int exitCode = 0;
     private volatile boolean stop;
 
-    WorkerServer(InputStream protocolIn, OutputStream protocolOut, WorkerLog log, long idleTimeoutMs) {
+    WorkerServer(InputStream protocolIn, OutputStream protocolOut, WorkerLog log, long idleTimeoutMs, WorkerContext context) {
         this.in = new FrameCodec.Reader(protocolIn);
         this.out = new FrameCodec.Writer(protocolOut);
         this.log = log;
         this.idleTimeoutMs = idleTimeoutMs;
+        this.context = context;
     }
 
     int run() {
@@ -135,7 +137,7 @@ final class WorkerServer {
                 send(new Message.ConfigLoaded(lc.id(), configId, previous.formats(), List.of(), null, null));
                 return;
             }
-            FormatEngine engine = EngineFactory.create(lc.config(), log);
+            FormatEngine engine = EngineFactory.create(lc.config(), context, log);
             List<String> warnings = engine.load();
             engines.put(configId, engine);
             send(new Message.ConfigLoaded(lc.id(), configId, engine.formats(), warnings, null, null));

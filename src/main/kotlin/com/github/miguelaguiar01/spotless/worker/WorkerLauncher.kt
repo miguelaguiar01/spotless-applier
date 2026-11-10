@@ -3,6 +3,7 @@ package com.github.miguelaguiar01.spotless.worker
 import com.github.miguelaguiar01.spotless.settings.SpotlessApplierSettings
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.ide.plugins.PluginManagerCore
+import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.extensions.PluginId
 import java.io.File
 import java.nio.charset.StandardCharsets
@@ -40,6 +41,9 @@ object WorkerLauncher {
         "-Xshare:auto",
     )
 
+    /** Resolved-classpath cache, under the IDE system directory. */
+    fun cacheDirectory(): Path = Path.of(PathManager.getSystemPath(), "spotless-applier-native")
+
     fun workerDirectory(): Path {
         System.getProperty(WORKER_DIR_PROPERTY)?.let { return Path.of(it) }
         val plugin = PluginManagerCore.getPlugin(PluginId.getId(PLUGIN_ID))
@@ -63,7 +67,12 @@ object WorkerLauncher {
             .withParameters(JVM_FLAGS)
             .withParameters("-Xmx${settings.workerMaxHeapMb.coerceAtLeast(256)}m")
             .withParameters("-cp", workerClasspath().joinToString(File.pathSeparator))
-            .withParameters(MAIN_CLASS, "--idle-timeout-ms=$idleMs", "--log-level=INFO")
+            .withParameters(
+                MAIN_CLASS,
+                "--idle-timeout-ms=$idleMs",
+                "--log-level=INFO",
+                "--cache-dir=${cacheDirectory()}",
+            )
             .withEnvironment("JAVA_TOOL_OPTIONS", "") // keep user JVM options from hijacking stdout
     }
 }

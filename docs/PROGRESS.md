@@ -9,11 +9,33 @@ Running log of phase status. Newest entries at the top of each section.
 | 0     | Recon and design                        | done (checkpoint confirmed 2026-11-10) |
 | 1     | Worker skeleton and IPC                 | **done** |
 | 2     | Maven config extraction (IDE side)      | **done** |
-| 3     | Worker, Maven mode (core + parity)      | not started |
+| 3     | Worker, Maven mode (core + parity)      | **core done**, parity corpus in progress |
 | 4     | IDE integration                         | not started |
 | 5     | Gradle support                          | not started |
 | 6     | Fallback path hardening                 | not started |
 | 7     | Polish and release                      | not started |
+
+## Phase 3 — what was done so far (2026-11-10)
+
+- `worker/resolve`: `MavenSettingsLoader` (settings.xml via
+  `DefaultSettingsBuilderFactory`, decryption via sec-dispatcher),
+  `ResolverEnvironment` (Resolver 2.0.25 `RepositorySystemSupplier` +
+  `SessionBuilderSupplier`, local repo, offline, mirrors/proxies/servers,
+  `newResolutionRepositories`), `PluginClasspathResolver` (runtime-scope
+  transitive resolution of `spotless-maven-plugin:<v>`, JSON cache per
+  version under `--cache-dir`, validated against the local repo).
+- `worker/maven`: `SpotlessClassLoader` (child-first with parent-first
+  allowlist), `MavenEngine` (resolve → classloader → adapter), `WorkerContext`
+  (adapter jar discovery next to the worker jar, one resolver per
+  settings/local-repo/offline tuple).
+- `worker-maven-adapter`: `MavenAdapterImpl` (ADR-018/019), `XmlToPlexus`,
+  `SimpleExpressionEvaluator`, `ConsumerLog`, `LintSupport`.
+- IDE launcher passes `--cache-dir=<system>/spotless-applier-native`.
+- Test `MavenModeTest`: real worker JVM resolves 3.11.0 from Central
+  (28 jars, ~5 s cold / ~2.5 s warm on this machine), formats with
+  google-java-format, custom `<formats>` block, `NOT_COVERED` for files
+  outside includes or outside the module, cache file written, unknown step
+  → `WORKER_LOAD_FAILED` with the same message Maven gives.
 
 ## Phase 2 — what was done (2026-11-10)
 
