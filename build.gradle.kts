@@ -68,6 +68,9 @@ intellijPlatform {
     // Needs to launch the IDE; a Windows installation used from WSL cannot be launched, so skip it
     // when building against a local IDE. Searchable options only index the settings page.
     buildSearchableOptions = !providers.gradleProperty("platformLocalPath").isPresent
+    // Instrumentation (@NotNull assertions, GUI forms; this plugin has no forms) downloads
+    // java-compiler-ant-tasks from JetBrains' repository, which such networks block as well.
+    instrumentCode = !providers.gradleProperty("platformLocalPath").isPresent
 
     pluginConfiguration {
         name = providers.gradleProperty("pluginName")

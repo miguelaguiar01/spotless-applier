@@ -52,3 +52,8 @@ tasks.test {
     systemProperty("spotless.test.protocolJar", project(":protocol").tasks.named<Jar>("jar").get().archiveFile.get().asFile.absolutePath)
     dependsOn(tasks.jar, ":protocol:jar")
 }
+
+intellijPlatform {
+    // See the root build script: no instrumentation when compiling against a local IDE.
+    instrumentCode = !providers.gradleProperty("platformLocalPath").isPresent
+}
