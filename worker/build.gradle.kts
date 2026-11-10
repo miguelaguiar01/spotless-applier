@@ -5,6 +5,11 @@ plugins {
 group = providers.gradleProperty("pluginGroup").get()
 version = providers.gradleProperty("pluginVersion").get()
 
+evaluationDependsOn(":protocol")
+evaluationDependsOn(":gradle-tooling")
+evaluationDependsOn(":worker-maven-adapter")
+evaluationDependsOn(":worker-gradle-adapter")
+
 repositories {
     mavenCentral()
 }
@@ -41,6 +46,8 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     // Parity fixtures with ratchetFrom need a git repository; JGit keeps the test free of a git binary.
     testImplementation("org.eclipse.jgit:org.eclipse.jgit:7.8.0.202609011348-r")
+    // Gradle parity: run the fixture builds through TestKit.
+    testImplementation(gradleTestKit())
 }
 
 configurations.all {
@@ -72,6 +79,12 @@ dependencies {
     mavenDistribution("org.apache.maven:apache-maven:$mavenVersion:bin@zip")
 }
 
+val copyTestAdapters by tasks.registering(Sync::class) {
+    from(project(":worker-maven-adapter").tasks.named<Jar>("jar"))
+    from(project(":worker-gradle-adapter").tasks.named<Jar>("jar"))
+    into(layout.buildDirectory.dir("test-adapters"))
+}
+
 val unpackMaven by tasks.registering(Sync::class) {
     from(mavenDistribution.map { zipTree(it) })
     into(layout.buildDirectory.dir("maven"))
@@ -81,12 +94,18 @@ tasks.test {
     useJUnitPlatform()
     // The integration test spawns a real worker JVM with the test's own classpath.
     systemProperty("spotless.worker.test.java", System.getProperty("java.home") + "/bin/java")
-    systemProperty("spotless.worker.test.adapterDir", project(":worker-maven-adapter").layout.buildDirectory.dir("libs").get().asFile.absolutePath)
+    systemProperty("spotless.worker.test.adapterDir", layout.buildDirectory.dir("test-adapters").get().asFile.absolutePath)
+    systemProperty("spotless.test.gradleHome", gradle.gradleHomeDir!!.absolutePath)
+    systemProperty("spotless.test.toolingJar", project(":gradle-tooling").tasks.named<Jar>("jar").get().archiveFile.get().asFile.absolutePath)
+    systemProperty("spotless.test.protocolJar", project(":protocol").tasks.named<Jar>("jar").get().archiveFile.get().asFile.absolutePath)
+    dependsOn(copyTestAdapters, ":gradle-tooling:jar", ":protocol:jar")
     systemProperty("spotless.test.fixtures", rootProject.layout.projectDirectory.dir("fixtures").asFile.absolutePath)
     systemProperty("spotless.test.mavenHome", layout.buildDirectory.dir("maven/apache-maven-$mavenVersion").get().asFile.absolutePath)
     // google-java-format & friends open javac internals reflectively; same flags the IDE passes the worker.
     jvmArgs("--add-opens=java.base/java.lang=ALL-UNNAMED")
-    dependsOn(":worker-maven-adapter:jar", unpackMaven)
+    dependsOn(unpackMaven)
     // Parity tests download formatters on first run; give them room.
     maxHeapSize = "1g"
+    // Opt-in benchmark (prints numbers for docs/BENCHMARKS.md): ./gradlew :worker:test --tests '*Benchmark*' -Dspotless.bench=true
+    systemProperty("spotless.bench", System.getProperty("spotless.bench", "false"))
 }

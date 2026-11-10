@@ -31,7 +31,7 @@ class MessageTest {
                 new Message.Error("3", "boom"), new Message.Log("WARN", "msg", "trace"),
                 new Message.LoadConfig("4", sampleConfig("3.11.0")),
                 new Message.ConfigLoaded("4", "abc", List.of(new Message.FormatInfo("java", List.of("**/*.java"), List.of())),
-                        List.of("w"), null, null),
+                        List.of("w"), null, null, List.of(new Message.FallbackFormat("shout", "closure", List.of("/p/notes.txt")))),
                 new Message.Invalidate("5", "abc"),
                 new Message.Format("6", "abc", "/p/A.java", "class A{}\n"),
                 new Message.FormatResult("6", FormatStatus.FORMATTED, "class A {}\n", null,
@@ -42,6 +42,16 @@ class MessageTest {
             Message back = Messages.decode(m.encode());
             assertEquals(m, back, m.type());
         }
+    }
+
+    @Test
+    void gradleConfigRoundTrips() {
+        SpotlessConfig.Gradle gradle = new SpotlessConfig.Gradle(List.of("/a.jar", "/b.jar"), List.of(
+                new SpotlessConfig.GradleFormat("java", "spotlessJava", "AAAA", "BBBB", "UTF-8", List.of("/p/A.java"), "main", null),
+                new SpotlessConfig.GradleFormat("misc", "spotlessMisc", null, null, "UTF-8", List.of(), null, "GRADLE_STEP_NOT_SERIALIZABLE")));
+        SpotlessConfig cfg = new SpotlessConfig(SpotlessConfig.Kind.GRADLE, "8.11.0", "/p", "/p/build", null, gradle, Map.of());
+        Message back = Messages.decode(new Message.LoadConfig("1", cfg).encode());
+        assertEquals(cfg, ((Message.LoadConfig) back).config());
     }
 
     @Test

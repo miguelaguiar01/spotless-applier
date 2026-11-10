@@ -55,7 +55,7 @@ public final class MavenEngine implements FormatEngine {
         }
 
         List<URL> urls = new ArrayList<>();
-        for (Path p : context.adapterJars()) urls.add(p.toUri().toURL());
+        for (Path p : context.adapterJars("worker-maven-adapter")) urls.add(p.toUri().toURL());
         for (Path p : classpath) urls.add(p.toUri().toURL());
         loader = new SpotlessClassLoader(urls, MavenEngine.class.getClassLoader());
 

@@ -34,12 +34,13 @@ class WorkerManagerTest : BasePlatformTestCase() {
         assertTrue(manager.isRunning)
     }
 
-    fun testUnsupportedKindReportsFallbackReason() = runBlocking {
+    fun testIncompleteConfigReportsFallbackReason() = runBlocking {
         val manager = WorkerManager.getInstance(project)
+        // GRADLE kind without a gradle section: the worker must answer with a stable reason, not crash.
         val cfg = SpotlessConfig(SpotlessConfig.Kind.GRADLE, "8.11.0", project.basePath ?: "/tmp", null, null, emptyMap())
         val loaded = manager.loadConfig(cfg)
         assertFalse(loaded.isOk)
-        assertEquals("NOT_IMPLEMENTED", loaded.fallbackReason)
+        assertEquals("EXTRACTION_FAILED", loaded.fallbackReason)
     }
 
     override fun tearDown() {

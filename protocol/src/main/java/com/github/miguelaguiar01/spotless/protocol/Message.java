@@ -168,13 +168,34 @@ public sealed interface Message {
         }
     }
 
+    /** A format the worker cannot run; its target files must go through the build tool. */
+    record FallbackFormat(String name, String reason, List<String> targetFiles) {
+        Map<String, Object> toJson() {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("name", name);
+            m.put("reason", reason);
+            m.put("targetFiles", targetFiles);
+            return m;
+        }
+
+        static FallbackFormat fromJson(Map<String, Object> m) {
+            return new FallbackFormat(Json.requireStr(m, "name"), Json.str(m, "reason"), Json.strList(m, "targetFiles"));
+        }
+    }
+
     /**
      * Result of {@link LoadConfig}. If {@code error} is non-null the config is unusable and the IDE
-     * must fall back; {@code fallbackReason} is a stable machine-readable code.
+     * must fall back; {@code fallbackReason} is a stable machine-readable code. {@code fallbackFormats}
+     * lists formats of an otherwise usable config that the build tool must handle.
      */
     record ConfigLoaded(String id, String configId, List<FormatInfo> formats, List<String> warnings,
-                        String error, String fallbackReason) implements Message {
+                        String error, String fallbackReason, List<FallbackFormat> fallbackFormats) implements Message {
         public static final String TYPE = "configLoaded";
+
+        public ConfigLoaded(String id, String configId, List<FormatInfo> formats, List<String> warnings,
+                            String error, String fallbackReason) {
+            this(id, configId, formats, warnings, error, fallbackReason, List.of());
+        }
 
         @Override
         public String type() {
@@ -183,6 +204,14 @@ public sealed interface Message {
 
         public boolean isOk() {
             return error == null;
+        }
+
+        /** True when {@code path} is a target of a format the build tool must handle. */
+        public boolean needsBuildTool(String path) {
+            for (FallbackFormat f : fallbackFormats) {
+                if (f.targetFiles().contains(path)) return true;
+            }
+            return false;
         }
 
         @Override
@@ -195,6 +224,9 @@ public sealed interface Message {
             m.put("warnings", warnings);
             m.put("error", error);
             m.put("fallbackReason", fallbackReason);
+            List<Object> fb = new ArrayList<>();
+            for (FallbackFormat f : fallbackFormats) fb.add(f.toJson());
+            m.put("fallbackFormats", fb);
             return m;
         }
     }
@@ -350,8 +382,10 @@ public sealed interface Message {
             case ConfigLoaded.TYPE: {
                 List<FormatInfo> formats = new ArrayList<>();
                 for (Object o : Json.list(m, "formats")) formats.add(FormatInfo.fromJson((Map<String, Object>) o));
+                List<FallbackFormat> fallback = new ArrayList<>();
+                for (Object o : Json.list(m, "fallbackFormats")) fallback.add(FallbackFormat.fromJson((Map<String, Object>) o));
                 return new ConfigLoaded(id, Json.str(m, "configId"), formats, Json.strList(m, "warnings"),
-                        Json.str(m, "error"), Json.str(m, "fallbackReason"));
+                        Json.str(m, "error"), Json.str(m, "fallbackReason"), fallback);
             }
             case Invalidate.TYPE:
                 return new Invalidate(id, Json.requireStr(m, "configId"));

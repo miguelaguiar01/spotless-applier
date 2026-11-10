@@ -32,14 +32,15 @@ public final class WorkerContext implements AutoCloseable {
         return cacheDir;
     }
 
-    /** The adapter jars (compiled against the Spotless Maven plugin API) shipped next to the worker. */
-    public List<Path> adapterJars() {
+    /** The adapter jars whose file name starts with {@code prefix}, shipped next to the worker under {@code adapter/}. */
+    public List<Path> adapterJars(String prefix) {
         if (adapterDir == null || !Files.isDirectory(adapterDir)) {
             throw new IllegalStateException("Adapter directory not found: " + adapterDir);
         }
         try (Stream<Path> s = Files.list(adapterDir)) {
-            List<Path> jars = new ArrayList<>(s.filter(p -> p.getFileName().toString().endsWith(".jar")).sorted().toList());
-            if (jars.isEmpty()) throw new IllegalStateException("No adapter jars in " + adapterDir);
+            List<Path> jars = new ArrayList<>(s.filter(p -> p.getFileName().toString().startsWith(prefix)
+                    && p.getFileName().toString().endsWith(".jar")).sorted().toList());
+            if (jars.isEmpty()) throw new IllegalStateException("No " + prefix + "*.jar in " + adapterDir);
             return jars;
         } catch (java.io.IOException e) {
             throw new IllegalStateException("Cannot list " + adapterDir, e);

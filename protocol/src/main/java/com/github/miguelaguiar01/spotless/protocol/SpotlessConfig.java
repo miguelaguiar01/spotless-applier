@@ -23,8 +23,14 @@ public record SpotlessConfig(
         /** Module build directory (Maven {@code target/}), as seen by the worker process. */
         String buildDir,
         Maven maven,
-        /** Free-form extras; used by {@link Kind#BUILTIN_TEST} and reserved for Gradle. */
+        Gradle gradle,
+        /** Free-form extras; used by {@link Kind#BUILTIN_TEST}. */
         Map<String, Object> extra) {
+
+    /** Convenience for Maven/test configs. */
+    public SpotlessConfig(Kind kind, String spotlessVersion, String projectDir, String buildDir, Maven maven, Map<String, Object> extra) {
+        this(kind, spotlessVersion, projectDir, buildDir, maven, null, extra);
+    }
 
     public enum Kind {
         /** Worker-internal trivial steps; used by tests and smoke checks. */
@@ -95,6 +101,56 @@ public record SpotlessConfig(
         }
     }
 
+    public record GradleFormat(
+            String name,
+            String taskName,
+            /** Base64 of the Java-serialized ConfigurationCacheHackList (roundtrip). */
+            String stepsBase64,
+            String lineEndingPolicyBase64,
+            String encoding,
+            List<String> targetFiles,
+            String ratchetFrom,
+            /** Non-null: this format must go through the build tool. */
+            String fallbackReason) {
+
+        public Map<String, Object> toJson() {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("name", name);
+            m.put("taskName", taskName);
+            m.put("stepsBase64", stepsBase64);
+            m.put("lineEndingPolicyBase64", lineEndingPolicyBase64);
+            m.put("encoding", encoding);
+            m.put("targetFiles", targetFiles);
+            m.put("ratchetFrom", ratchetFrom);
+            m.put("fallbackReason", fallbackReason);
+            return m;
+        }
+
+        public static GradleFormat fromJson(Map<String, Object> m) {
+            return new GradleFormat(Json.requireStr(m, "name"), Json.str(m, "taskName"), Json.str(m, "stepsBase64"),
+                    Json.str(m, "lineEndingPolicyBase64"), Json.str(m, "encoding"), Json.strList(m, "targetFiles"),
+                    Json.str(m, "ratchetFrom"), Json.str(m, "fallbackReason"));
+        }
+    }
+
+    public record Gradle(List<String> classpath, List<GradleFormat> formats) {
+        public Map<String, Object> toJson() {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("classpath", classpath);
+            List<Object> fs = new ArrayList<>();
+            for (GradleFormat f : formats) fs.add(f.toJson());
+            m.put("formats", fs);
+            return m;
+        }
+
+        @SuppressWarnings("unchecked")
+        public static Gradle fromJson(Map<String, Object> m) {
+            List<GradleFormat> fs = new ArrayList<>();
+            for (Object o : Json.list(m, "formats")) fs.add(GradleFormat.fromJson((Map<String, Object>) o));
+            return new Gradle(Json.strList(m, "classpath"), fs);
+        }
+    }
+
     public SpotlessConfig {
         Objects.requireNonNull(kind, "kind");
         Objects.requireNonNull(projectDir, "projectDir");
@@ -108,12 +164,14 @@ public record SpotlessConfig(
         m.put("projectDir", projectDir);
         m.put("buildDir", buildDir);
         m.put("maven", maven == null ? null : maven.toJson());
+        m.put("gradle", gradle == null ? null : gradle.toJson());
         m.put("extra", extra);
         return m;
     }
 
     public static SpotlessConfig fromJson(Map<String, Object> m) {
         Map<String, Object> maven = Json.obj(m, "maven");
+        Map<String, Object> gradle = Json.obj(m, "gradle");
         Map<String, Object> extra = Json.obj(m, "extra");
         return new SpotlessConfig(
                 Kind.valueOf(Json.requireStr(m, "kind")),
@@ -121,6 +179,7 @@ public record SpotlessConfig(
                 Json.requireStr(m, "projectDir"),
                 Json.str(m, "buildDir"),
                 maven == null ? null : Maven.fromJson(maven),
+                gradle == null ? null : Gradle.fromJson(gradle),
                 extra == null ? Map.of() : extra);
     }
 

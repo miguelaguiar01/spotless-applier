@@ -10,7 +10,7 @@ import java.util.List;
  * whatever the worker itself uses; only the shared API packages are forced parent-first so that
  * Maven/Resolver/Plexus-configurator/protocol types are the same {@code Class} objects on both sides.
  */
-final class SpotlessClassLoader extends URLClassLoader {
+public final class SpotlessClassLoader extends URLClassLoader {
     static {
         registerAsParallelCapable();
     }

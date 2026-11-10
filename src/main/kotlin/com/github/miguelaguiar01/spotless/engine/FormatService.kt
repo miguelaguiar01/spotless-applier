@@ -99,8 +99,15 @@ class FormatService(private val project: Project, private val scope: CoroutineSc
                 FormatOutcome.Clean
             }
             FormatStatus.NOT_COVERED -> {
-                notifications.statusBar("Spotless: $displayName is not covered by the Spotless configuration")
-                FormatOutcome.NotCovered
+                val info = WorkerManager.getInstance(project).loadedInfo(config.configId())
+                val realPath = runCatching { java.nio.file.Path.of(path).toRealPath().toString() }.getOrDefault(path)
+                if (info != null && (info.needsBuildTool(path) || info.needsBuildTool(realPath))) {
+                    FormatOutcome.FellBack(FallbackReason.GRADLE_STEP_NOT_SERIALIZABLE,
+                        "$displayName belongs to a Spotless format the native engine cannot run (${info.fallbackFormats.joinToString { it.name }})")
+                } else {
+                    notifications.statusBar("Spotless: $displayName is not covered by the Spotless configuration")
+                    FormatOutcome.NotCovered
+                }
             }
             FormatStatus.DID_NOT_CONVERGE -> {
                 notifications.error("Spotless did not converge", "$displayName: ${result.message}")

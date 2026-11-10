@@ -10,10 +10,48 @@ Running log of phase status. Newest entries at the top of each section.
 | 1     | Worker skeleton and IPC                 | **done** |
 | 2     | Maven config extraction (IDE side)      | **done** |
 | 3     | Worker, Maven mode (core + parity)      | **done** (7/7 parity fixtures byte-identical) |
-| 4     | IDE integration                         | **done** (benchmarks pending) |
-| 5     | Gradle support                          | not started |
+| 4     | IDE integration                         | **done** |
+| 5     | Gradle support                          | **done** (3/3 parity fixtures, custom closure → fallback) |
 | 6     | Fallback path hardening                 | **done** (remote worker deferred, see known gaps) |
-| 7     | Polish and release                      | not started |
+| 7     | Polish and release                      | **done, awaiting checkpoint** (plugin verifier runs in CI) |
+
+## Phase 7 — what was done (2026-11-10)
+
+- `docs/BENCHMARKS.md` from `MavenBenchmarkTest` (p50 29 ms native vs 4.4 s build tool).
+- README (how it works, settings, fallback reasons, troubleshooting), CHANGELOG 2.0.0,
+  `.github/workflows/build.yml` (build + all tests incl. parity, plugin verifier job).
+- `verifyPluginStructure` passes locally; `verifyPlugin` (IDE matrix) left to CI because of the
+  IDE downloads.
+- Worker JVM flags: dropped `-XX:TieredStopAtLevel=1` (hurt steady-state formatting latency).
+
+### Definition of done (from the brief)
+1. Maven native, no mvn process, byte-identical across the corpus — **yes** (7 fixtures).
+2. Gradle within the allow-list, automatic fallback with reason — **yes** (3 fixtures; `custom {}` falls back).
+3. Warm latency recorded, large improvement — **yes** (`docs/BENCHMARKS.md`).
+4. File/project actions, on-save, optimize imports, Dev Containers — **yes** (Dev Containers via the build-tool path).
+5. Docs current — **yes**.
+
+### Not verified in this session
+- Interactive `runIde` session (headless environment): actions, settings UI and notifications are
+  compiled and unit/platform-tested, not clicked through.
+- Plugin verifier against the recommended IDE matrix (CI job).
+- Windows paths (parity ran on macOS only).
+
+## Phase 5 — what was done (2026-11-10)
+
+- `gradle-tooling` module: `SpotlessGradleModel` (+impl), `SpotlessTaskInspector`,
+  `SpotlessModelBuilder` registered via `META-INF/services` (ADR-020).
+- IDE: `SpotlessGradleProjectResolver` (EP `org.jetbrains.plugins.gradle.projectResolve`),
+  `SpotlessGradleData` DataNode, `GradleSpotlessConfigExtractor` (allow-list
+  7.x/8.x), `SpotlessConfigService.lookupGradle`, invalidation on sync.
+- Worker: `GradleEngine`, `GradleAdapter` SPI, `worker-gradle-adapter`
+  (deserialize + `Formatter.builder()` + ratchet + DirtyState).
+- Protocol: `SpotlessConfig.Gradle` / `GradleFormat`.
+- Tests: `SpotlessTaskInspectorTest` (TestKit + init script on the Kotlin
+  DSL fixture), `GradleParityTest` on `fixtures/gradle/{kts,groovy,v7}`
+  vs. `gradle spotlessApply` (Groovy `custom {}` expected to fall back).
+- `ProjectFormatter` formats Gradle modules natively from the captured
+  target set.
 
 ## Phase 6 — what was done (2026-11-10)
 
@@ -231,9 +269,8 @@ content of every file in the other, and results must be byte-identical
   blocked; we pass explicit `--add-opens/--add-exports` (ADR-014). Needs a
   test on the bundled JBR 25.
 
-## Next steps
+## Next steps (after the checkpoint)
 
-- Phase 5: Gradle sync-time model builder + worker Gradle mode (allow-list).
-- Phase 6: mvnd-safe fallback (`-DspotlessFiles`), Eel-spawned worker for
-  Dev Containers.
-- Phase 7: benchmarks, README, CHANGELOG, CI, plugin verifier, checkpoint.
+- Manual `runIde` pass on a real Maven and a real Gradle project.
+- Worker inside Dev Containers through the Eel exec API.
+- Windows CI leg for the parity corpus.

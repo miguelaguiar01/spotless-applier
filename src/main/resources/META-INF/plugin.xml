@@ -34,6 +34,10 @@
         <formattingService implementation="com.github.miguelaguiar01.spotless.format.SpotlessFormattingService"/>
     </extensions>
 
+    <extensions defaultExtensionNs="org.jetbrains.plugins.gradle">
+        <projectResolve implementation="com.github.miguelaguiar01.spotless.config.gradle.SpotlessGradleProjectResolver"/>
+    </extensions>
+
     <extensionPoints>
         <extensionPoint name="formatOnSaveOptions.spotlessProvider"
                         interface="com.github.miguelaguiar01.spotless.onsave.SpotlessOnSaveOptionsBase$DefaultsProvider"

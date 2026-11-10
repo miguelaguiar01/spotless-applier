@@ -43,8 +43,11 @@ val workerAdapter: Configuration by configurations.creating {
 
 dependencies {
     implementation(project(":protocol"))
+    // Gradle sync-time model builder; its jar is sent to the Gradle daemon (ADR-020).
+    implementation(project(":gradle-tooling"))
     workerRuntime(project(":worker"))
     workerAdapter(project(":worker-maven-adapter"))
+    workerAdapter(project(":worker-gradle-adapter"))
 
     intellijPlatform {
         intellijIdea(providers.gradleProperty("platformVersion"))

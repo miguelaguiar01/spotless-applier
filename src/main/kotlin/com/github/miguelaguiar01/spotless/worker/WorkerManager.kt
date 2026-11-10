@@ -44,6 +44,11 @@ class WorkerManager(private val project: Project, private val scope: CoroutineSc
     /** Known configs, re-sent after a restart. */
     private val configs = ConcurrentHashMap<String, SpotlessConfig>()
 
+    /** Last successful load result per configId (fallback formats, format infos). */
+    private val loadedInfo = ConcurrentHashMap<String, Message.ConfigLoaded>()
+
+    fun loadedInfo(configId: String): Message.ConfigLoaded? = loadedInfo[configId]
+
     private var consecutiveFailures = 0
     private var lastFailure: TimeSource.Monotonic.ValueTimeMark? = null
 
@@ -91,6 +96,7 @@ class WorkerManager(private val project: Project, private val scope: CoroutineSc
     suspend fun invalidate(configId: String) {
         configs.remove(configId)
         loaded.remove(configId)
+        loadedInfo.remove(configId)
         val conn = connection?.takeIf { it.isAlive } ?: return
         try {
             conn.request(REQUEST_TIMEOUT) { Message.Invalidate(it, configId) }
@@ -131,7 +137,10 @@ class WorkerManager(private val project: Project, private val scope: CoroutineSc
         configs[configId] = config
         val reply = conn.request(LOAD_TIMEOUT) { Message.LoadConfig(it, config) }
         check(reply is Message.ConfigLoaded) { "Expected configLoaded, got ${reply.type()}" }
-        if (reply.isOk) loaded.add(configId)
+        if (reply.isOk) {
+            loaded.add(configId)
+            loadedInfo[configId] = reply
+        }
         reply.warnings.forEach { WORKER_LOG.warn("[$configId] $it") }
         return reply
     }

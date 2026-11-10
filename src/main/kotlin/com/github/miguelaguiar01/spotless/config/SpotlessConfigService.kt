@@ -1,5 +1,6 @@
 package com.github.miguelaguiar01.spotless.config
 
+import com.github.miguelaguiar01.spotless.config.gradle.GradleSpotlessConfigExtractor
 import com.github.miguelaguiar01.spotless.config.maven.MavenSpotlessConfigExtractor
 import com.github.miguelaguiar01.spotless.engine.ConfigLookup
 import com.github.miguelaguiar01.spotless.engine.FallbackReason
@@ -8,6 +9,11 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.runReadActionBlocking
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.logger
+import com.intellij.openapi.externalSystem.service.project.manage.ProjectDataImportListener
+import com.intellij.openapi.externalSystem.util.ExternalSystemApiUtil
+import com.intellij.openapi.module.Module
+import com.intellij.openapi.module.ModuleUtilCore
+import org.jetbrains.plugins.gradle.util.GradleConstants
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Pair
 import com.intellij.openapi.vfs.VirtualFile
@@ -40,10 +46,29 @@ class SpotlessConfigService(private val project: Project, private val scope: Cor
         val manager = MavenProjectsManager.getInstance(project)
         if (manager.isMavenizedProject) {
             val mavenProject = runReadActionBlocking { manager.findContainingProject(file) }
-                ?: return ConfigLookup.Unavailable(FallbackReason.NO_MAVEN_PROJECT, "${file.path} is not inside an imported Maven module")
-            return lookup(mavenProject)
+            if (mavenProject != null) return lookup(mavenProject)
         }
-        return ConfigLookup.Unavailable(FallbackReason.NO_MAVEN_PROJECT, "Not a Maven project (Gradle support is not implemented yet)")
+        val module = runReadActionBlocking { ModuleUtilCore.findModuleForFile(file, project) }
+            ?: return ConfigLookup.Unavailable(FallbackReason.NO_MAVEN_PROJECT, "${file.path} does not belong to a module")
+        if (ExternalSystemApiUtil.isExternalSystemAwareModule(GradleConstants.SYSTEM_ID, module)) {
+            return lookupGradle(module)
+        }
+        return ConfigLookup.Unavailable(FallbackReason.NO_MAVEN_PROJECT, "${module.name} is neither a Maven nor a Gradle module")
+    }
+
+    fun lookupGradle(module: Module): ConfigLookup {
+        ensureListening()
+        val key = "gradle:" + (ExternalSystemApiUtil.getExternalProjectPath(module) ?: module.name)
+        return cache.computeIfAbsent(key) {
+            val result = GradleSpotlessConfigExtractor.extract(module)
+            if (result is ConfigLookup.Found) {
+                LOG.info("Spotless Gradle config for ${module.name}: id=${result.config.configId()} version=${result.config.spotlessVersion}")
+                result.warnings.forEach { LOG.warn("${module.name}: $it") }
+            } else if (result is ConfigLookup.Unavailable) {
+                LOG.info("No native Spotless config for ${module.name}: ${result.reason} (${result.detail})")
+            }
+            result
+        }
     }
 
     fun lookup(mavenProject: MavenProject): ConfigLookup {
@@ -112,6 +137,18 @@ class SpotlessConfigService(private val project: Project, private val scope: Cor
             project.messageBus.connect(this).subscribe(MavenImportListener.TOPIC, object : MavenImportListener {
                 override fun importFinished(importedProjects: Collection<MavenProject>, newModules: List<com.intellij.openapi.module.Module>) {
                     refresh(importedProjects)
+                }
+            })
+            // Gradle: after any sync, drop Gradle entries; the worker's old formatters are invalidated lazily on next use.
+            project.messageBus.connect(this).subscribe(ProjectDataImportListener.TOPIC, object : ProjectDataImportListener {
+                override fun onImportFinished(projectPath: String?) {
+                    val stale = cache.filterKeys { it.startsWith("gradle:") }
+                    stale.keys.forEach { cache.remove(it) }
+                    val ids = stale.values.filterIsInstance<ConfigLookup.Found>().map { it.config.configId() }
+                    if (ids.isNotEmpty()) {
+                        val worker = WorkerManager.getInstance(project)
+                        scope.launch(Dispatchers.IO) { ids.forEach { worker.invalidate(it) } }
+                    }
                 }
             })
         }

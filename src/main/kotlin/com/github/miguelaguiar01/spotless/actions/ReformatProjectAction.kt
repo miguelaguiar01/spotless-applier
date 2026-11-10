@@ -54,7 +54,7 @@ class ReformatProjectAction : AnAction(), DumbAware {
             val formatter = ProjectFormatter(project)
             for (moduleInfo in selected) {
                 val summary = formatter.formatModuleNatively(moduleInfo)
-                if (summary == null) {
+                if (summary == null || summary.needsBuildTool) {
                     withContext(Dispatchers.EDT) { FormatService.getInstance(project).runBuildTool(moduleInfo) }
                 }
             }

@@ -134,13 +134,13 @@ final class WorkerServer {
         try {
             FormatEngine previous = engines.get(configId);
             if (previous != null) {
-                send(new Message.ConfigLoaded(lc.id(), configId, previous.formats(), List.of(), null, null));
+                send(new Message.ConfigLoaded(lc.id(), configId, previous.formats(), List.of(), null, null, previous.fallbackFormats()));
                 return;
             }
             FormatEngine engine = EngineFactory.create(lc.config(), context, log);
             List<String> warnings = engine.load();
             engines.put(configId, engine);
-            send(new Message.ConfigLoaded(lc.id(), configId, engine.formats(), warnings, null, null));
+            send(new Message.ConfigLoaded(lc.id(), configId, engine.formats(), warnings, null, null, engine.fallbackFormats()));
         } catch (FormatEngine.UnsupportedConfigException e) {
             log.warn("Config " + configId + " not supported natively: " + e.getMessage());
             send(new Message.ConfigLoaded(lc.id(), configId, List.of(), List.of(), e.getMessage(), e.reason()));

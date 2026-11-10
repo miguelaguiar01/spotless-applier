@@ -37,7 +37,6 @@ object WorkerLauncher {
         "-Dfile.encoding=UTF-8",
         "-Djava.awt.headless=true",
         "-XX:+UseSerialGC",
-        "-XX:TieredStopAtLevel=1",
         "-Xshare:auto",
     )
 

@@ -11,6 +11,11 @@ public interface FormatEngine extends AutoCloseable {
 
     List<Message.FormatInfo> formats();
 
+    /** Formats of this config that the build tool must handle (their targets are NOT_COVERED here). */
+    default List<Message.FallbackFormat> fallbackFormats() {
+        return List.of();
+    }
+
     /** {@code text} has Unix line endings; the result text must too. */
     Message.FormatResult format(String requestId, String path, String text) throws Exception;
 

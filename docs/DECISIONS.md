@@ -290,7 +290,9 @@ palantir and cleanthat) via `Unsafe` + `IMPL_LOOKUP`; its own test JVMs add
 `--add-exports jdk.compiler/com.sun.tools.javac.{api,file,parser,tree,util}=ALL-UNNAMED`
 so formatting works even where the reflective hack is blocked (JDK 25+
 tightens `Unsafe`). Also `-Xss` default, `-Xmx` from a setting (default 1g),
-`-Dfile.encoding=UTF-8`, `-Djava.awt.headless=true`.
+`-Dfile.encoding=UTF-8`, `-Djava.awt.headless=true`, `-XX:+UseSerialGC`.
+`-XX:TieredStopAtLevel=1` was tried and dropped: it shortens start-up but
+caps the JIT, and the worker is long-lived (Phase 7 benchmark).
 
 ## ADR-015: Worker jars live in `lib/worker/`, outside the plugin classloader
 
@@ -360,3 +362,37 @@ Status: accepted
   surface as `ERROR` for that file (the IDE then falls back).
 - Lints (3.x) are collected via `LintState.of(formatter, file, bytes)` with
   `<lintSuppressions>` applied, and returned alongside the result (ADR-010).
+
+## ADR-020: Gradle mode = sync-time serialization of SpotlessTask state
+
+Status: accepted (verified against spotless-plugin-gradle 8.11.0 and 7.0.4)
+
+- `gradle-tooling` (Java 11 bytecode, Gradle API + IntelliJ tooling-extension
+  API only) ships inside the plugin and is sent to the Gradle daemon by
+  `SpotlessGradleProjectResolver.getToolingExtensionsClasses()`. Its
+  `SpotlessModelBuilder` runs for every project during IntelliJ's sync and,
+  by reflection only, finds tasks extending
+  `com.diffplug.gradle.spotless.SpotlessTask`, serializes
+  `getStepsInternalRoundtrip()` (the `ConfigurationCacheHackList` Spotless
+  itself uses for Gradle's configuration cache) and
+  `getLineEndingsPolicy().get()` with Java serialization, and records
+  encoding, target files, `ratchetFrom` and the buildscript classpath
+  (classloader URLs + resolved `buildscript.classpath`).
+- The model travels through the normal external-system DataNode graph
+  (`SpotlessGradleData` under the module node, persisted in the project
+  data cache) so no extra Gradle invocation is needed.
+- The worker loads that classpath child-first together with
+  `worker-gradle-adapter` (compiled against spotless-lib 4.11.0, which the
+  user's lib replaces at runtime), deserializes with a classloader-aware
+  `ObjectInputStream`, and builds `Formatter.builder()` exactly as
+  `SpotlessTask.buildFormatter()` does. Coverage is the explicit target set
+  captured at sync time (new files need a re-sync; the IDE then falls back
+  for them with `NOT_COVERED`).
+- Groovy `custom {}` closures serialize but reference the build-script
+  class, which only exists in Gradle's script classloader: deserialization
+  fails → that format is marked fallback-only; other formats of the project
+  stay native. Files owned only by fallback formats are `NOT_COVERED`.
+- Allow-list: plugin majors 7 and 8 (parity-tested on 7.0.4 and 8.11.0);
+  anything else → `SPOTLESS_VERSION_UNSUPPORTED`.
+- Gradle sync completion (`ProjectDataImportListener`) drops cached Gradle
+  configs and invalidates their worker formatters.

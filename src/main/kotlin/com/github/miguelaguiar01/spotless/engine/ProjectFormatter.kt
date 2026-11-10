@@ -47,22 +47,25 @@ class ProjectFormatter(private val project: Project) {
     private val LOG = logger<ProjectFormatter>()
     private val notifications get() = SpotlessNotifications.getInstance(project)
 
-    data class Summary(val module: String, val scanned: Int, val formatted: Int, val failed: Int, val notCovered: Int)
+    data class Summary(val module: String, val scanned: Int, val formatted: Int, val failed: Int, val notCovered: Int,
+                       /** Some formats need the build tool; the caller should run it for this module too. */
+                       val needsBuildTool: Boolean = false)
 
     /** Returns null when the module must go through the build tool (reason already notified). */
     suspend fun formatModuleNatively(moduleInfo: ModuleInfo): Summary? {
         if (SpotlessApplierSettings.getInstance().engine == Engine.BUILD_TOOL) return null
-        if (moduleInfo.buildTool() != BuildTool.MAVEN) {
-            notifications.fallback(FallbackReason.NOT_IMPLEMENTED, "Gradle projects use the build tool in this version")
-            return null
+        val lookup = if (moduleInfo.buildTool() == BuildTool.MAVEN) {
+            val dir = LocalFileSystem.getInstance().findFileByPath(moduleInfo.path()) ?: return null
+            val mavenProject = readAction { MavenProjectsManager.getInstance(project).findContainingProject(dir) }
+            if (mavenProject == null) {
+                notifications.fallback(FallbackReason.NO_MAVEN_PROJECT, "${moduleInfo.path()} is not an imported Maven module")
+                return null
+            }
+            readAction { SpotlessConfigService.getInstance(project).lookup(mavenProject) }
+        } else {
+            val module = moduleInfo.module() ?: return null
+            readAction { SpotlessConfigService.getInstance(project).lookupGradle(module) }
         }
-        val dir = LocalFileSystem.getInstance().findFileByPath(moduleInfo.path()) ?: return null
-        val mavenProject = readAction { MavenProjectsManager.getInstance(project).findContainingProject(dir) }
-        if (mavenProject == null) {
-            notifications.fallback(FallbackReason.NO_MAVEN_PROJECT, "${moduleInfo.path()} is not an imported Maven module")
-            return null
-        }
-        val lookup = readAction { SpotlessConfigService.getInstance(project).lookup(mavenProject) }
         val config = when (lookup) {
             is ConfigLookup.Unavailable -> {
                 notifications.fallback(lookup.reason, lookup.detail)
@@ -82,10 +85,19 @@ class ProjectFormatter(private val project: Project) {
             return null
         }
         val root = Path.of(config.projectDir)
-        val candidates = withContext(Dispatchers.IO) { collectCandidates(root, loaded.formats) }
-        return withBackgroundProgress(project, "Spotless: ${moduleInfo.module()?.name ?: root.fileName}", cancellable = true) {
+        val candidates = withContext(Dispatchers.IO) {
+            config.gradle?.let { g -> g.formats.filter { it.fallbackReason() == null }.flatMap { it.targetFiles() }.map(Path::of).distinct().sorted() }
+                ?: collectCandidates(root, loaded.formats)
+        }
+        val summary = withBackgroundProgress(project, "Spotless: ${moduleInfo.module()?.name ?: root.fileName}", cancellable = true) {
             formatFiles(config, root, candidates, moduleInfo.module()?.name ?: root.toString())
         }
+        if (loaded.fallbackFormats.isNotEmpty()) {
+            notifications.fallback(FallbackReason.GRADLE_STEP_NOT_SERIALIZABLE,
+                "${summary.module}: formats ${loaded.fallbackFormats.joinToString { it.name }} run through the build tool")
+            return summary.copy(needsBuildTool = true)
+        }
+        return summary
     }
 
     private suspend fun formatFiles(config: SpotlessConfig, root: Path, files: List<Path>, moduleName: String): Summary {
