@@ -21,8 +21,11 @@ Running log of phase status. Newest entries at the top of each section.
 - Cloned `lipiridi/spotless-applier` 1.3.0 to scratch, read all ~20 source
   files, `plugin.xml`, build files and CI. Built it with its own wrapper
   (Gradle 9.2.1, IntelliJ Platform Gradle Plugin 2.10.5, platform 2026.1,
-  Java 21): compilation, instrumentation and `buildSearchableOptions`
-  succeeded; the platform `IU-261.22158.277` is now in the Gradle cache.
+  Java 21): `buildPlugin test` → BUILD SUCCESSFUL in 43s (warm cache),
+  `spotless-applier-1.3.0.zip` produced. The original has **no tests**
+  (`:test NO-SOURCE`). The platform `IU-261.22158.277` is now in the Gradle
+  cache. `runIde` was not exercised (headless session); `buildSearchableOptions`
+  did launch the IDE headless successfully, which covers the same classpath.
 - Cloned `diffplug/spotless`, checked out `maven/3.11.0` and `maven/2.44.5`;
   read `lib`, `lib-extra`, `plugin-maven`, `plugin-gradle` sources.
   Downloaded `spotless-maven-plugin-3.11.0.jar` and inspected
