@@ -33,6 +33,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
+import java.util.regex.Pattern;
 import java.util.Objects;
 import java.util.Optional;
 import org.gradle.util.GradleVersion;
@@ -41,6 +43,9 @@ import org.jetbrains.idea.maven.execution.MavenRunConfigurationType;
 import org.jetbrains.idea.maven.execution.MavenRunner;
 import org.jetbrains.idea.maven.execution.MavenRunnerParameters;
 import org.jetbrains.idea.maven.execution.MavenRunnerSettings;
+import org.jetbrains.idea.maven.project.MavenHomeType;
+import org.jetbrains.idea.maven.project.MavenInSpecificPath;
+import org.jetbrains.idea.maven.project.MavenProjectsManager;
 import org.jetbrains.idea.maven.utils.MavenUtil;
 import org.jetbrains.plugins.gradle.settings.GradleProjectSettings;
 import org.jetbrains.plugins.gradle.settings.GradleSettings;
@@ -183,11 +188,17 @@ public class ReformatProcessor {
             final String adjusted;
             final String rootPath = File.listRoots()[0].getPath();
             if (rootPath.equals("/")) { // Unix / Linux / macOS
-                adjusted = "/" + rawPath;
+                adjusted = rawPath.startsWith("/") ? rawPath : "/" + rawPath;
             } else { // Windows and others
                 adjusted = rawPath;
             }
-            commands.add("-DspotlessIdeHook=" + adjusted);
+            if (isMavenDaemonHome()) {
+                // mvnd 1.0.x crashes after the IDE hook closes System.out (apache/maven-mvnd#1271);
+                // -DspotlessFiles takes a regex over absolute paths and avoids the hook entirely.
+                commands.add("-DspotlessFiles=" + Pattern.quote(adjusted));
+            } else {
+                commands.add("-DspotlessIdeHook=" + adjusted);
+            }
         }
 
         ExternalSystemTaskExecutionSettings externalSettings = new ExternalSystemTaskExecutionSettings();
@@ -223,6 +234,19 @@ public class ReformatProcessor {
         ProgramRunner<?> runner = DefaultJavaProgramRunner.getInstance();
         Executor executor = DefaultRunExecutor.getRunExecutorInstance();
         return new ExecutionEnvironment(executor, runner, configSettings, project);
+    }
+
+    /** True when the configured Maven home points into a Maven Daemon (mvnd) distribution. */
+    boolean isMavenDaemonHome() {
+        try {
+            MavenHomeType home = MavenProjectsManager.getInstance(project).getGeneralSettings().getMavenHomeType();
+            if (home instanceof MavenInSpecificPath specific) {
+                return specific.getMavenHome().toLowerCase(Locale.ROOT).contains("mvnd");
+            }
+        } catch (RuntimeException e) {
+            LOG.debug("Cannot determine Maven home type", e);
+        }
+        return false;
     }
 
     private void optimizeImports() {

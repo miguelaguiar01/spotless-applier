@@ -12,8 +12,22 @@ Running log of phase status. Newest entries at the top of each section.
 | 3     | Worker, Maven mode (core + parity)      | **done** (7/7 parity fixtures byte-identical) |
 | 4     | IDE integration                         | **done** (benchmarks pending) |
 | 5     | Gradle support                          | not started |
-| 6     | Fallback path hardening                 | not started |
+| 6     | Fallback path hardening                 | **done** (remote worker deferred, see known gaps) |
 | 7     | Polish and release                      | not started |
+
+## Phase 6 — what was done (2026-11-10)
+
+- mvnd: when the configured Maven home path contains `mvnd`, the fallback
+  passes `-DspotlessFiles=\Q<abs path>\E` instead of `-DspotlessIdeHook`
+  (IntelliJ itself never launches the mvnd daemon; see ADR-011).
+- ijent/Dev Containers: the ported build-tool path keeps the Eel path
+  translation; the native engine falls back for non-local files (ADR-011).
+
+### Known gaps
+- Worker inside Dev Containers (Eel-spawned) — deferred; native engine
+  falls back to the build tool there.
+- `spotlessSetLicenseHeaderYearsFromGitHistory` is a user property and is
+  not set by the IDE (same as the original plugin).
 
 ## Phase 4 — what was done (2026-11-10)
 

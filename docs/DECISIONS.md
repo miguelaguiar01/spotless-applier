@@ -212,10 +212,18 @@ Status: accepted (checkpoint 2026-11-10)
 - `spotlessSetLicenseHeaderYearsFromGitHistory` is a user property
   (`-D…=true`), not POM config. Not set by the IDE; same as the current
   plugin's behavior.
-- Remote/ijent: v1 spawns the worker through the Eel exec API when the
-  project is not local, copying the worker jar into the target with Eel's
-  file API; if that fails → build-tool fallback (which already works in
-  ijent). This is listed as a risk; measure in Phase 6.
+- Remote/ijent: **revised in Phase 6** — v1 falls back to the build tool
+  for files whose `EelDescriptor` is not local (the ported build-tool path
+  keeps the original's Eel path translation, so Dev Containers keep
+  working as before). Spawning the worker inside the container through the
+  Eel exec API, shipping the worker jars and resolving artifacts there is
+  deferred to a follow-up (tracked in PROGRESS.md "known gaps"); the native
+  engine would otherwise format against the host's view of the files and
+  the host's local repository, which is wrong for a container build.
+- mvnd: IntelliJ never runs the mvnd daemon itself (its Maven runner uses
+  the classworlds launcher), so the NPE only reaches users whose Maven home
+  points into an mvnd distribution. In that case the fallback passes
+  `-DspotlessFiles=\Q<absolute path>\E` instead of `-DspotlessIdeHook`.
 
 ## ADR-012: Build and toolchain baseline
 
