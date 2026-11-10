@@ -6,7 +6,7 @@ import org.jetbrains.intellij.platform.gradle.tasks.VerifyPluginTask.FailureLeve
 
 plugins {
     id("java")
-    id("org.jetbrains.kotlin.jvm") version "2.2.21"
+    id("org.jetbrains.kotlin.jvm") version "2.4.21"
     id("org.jetbrains.intellij.platform") version "2.10.5"
     id("org.jetbrains.changelog") version "2.5.0"
 }
@@ -16,6 +16,12 @@ version = providers.gradleProperty("pluginVersion").get()
 
 kotlin {
     jvmToolchain(21)
+    compilerOptions {
+        // The IDE's bundled stdlib is used at runtime (kotlin.stdlib.default.dependency=false).
+        // Pin the API level so compiling with a newer compiler cannot leak stdlib calls that the
+        // oldest supported IDE (2026.1) does not have.
+        apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_2)
+    }
 }
 
 repositories {
