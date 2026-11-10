@@ -39,6 +39,8 @@ dependencies {
     testImplementation(platform("org.junit:junit-bom:5.11.4"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    // Parity fixtures with ratchetFrom need a git repository; JGit keeps the test free of a git binary.
+    testImplementation("org.eclipse.jgit:org.eclipse.jgit:7.8.0.202609011348-r")
 }
 
 configurations.all {
@@ -59,10 +61,32 @@ tasks.jar {
     }
 }
 
+// A real Maven distribution for the parity tests (golden outputs come from `mvn spotless:apply`).
+val mavenDistribution: Configuration by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+    isTransitive = false
+}
+
+dependencies {
+    mavenDistribution("org.apache.maven:apache-maven:$mavenVersion:bin@zip")
+}
+
+val unpackMaven by tasks.registering(Sync::class) {
+    from(mavenDistribution.map { zipTree(it) })
+    into(layout.buildDirectory.dir("maven"))
+}
+
 tasks.test {
     useJUnitPlatform()
     // The integration test spawns a real worker JVM with the test's own classpath.
     systemProperty("spotless.worker.test.java", System.getProperty("java.home") + "/bin/java")
     systemProperty("spotless.worker.test.adapterDir", project(":worker-maven-adapter").layout.buildDirectory.dir("libs").get().asFile.absolutePath)
-    dependsOn(":worker-maven-adapter:jar")
+    systemProperty("spotless.test.fixtures", rootProject.layout.projectDirectory.dir("fixtures").asFile.absolutePath)
+    systemProperty("spotless.test.mavenHome", layout.buildDirectory.dir("maven/apache-maven-$mavenVersion").get().asFile.absolutePath)
+    // google-java-format & friends open javac internals reflectively; same flags the IDE passes the worker.
+    jvmArgs("--add-opens=java.base/java.lang=ALL-UNNAMED")
+    dependsOn(":worker-maven-adapter:jar", unpackMaven)
+    // Parity tests download formatters on first run; give them room.
+    maxHeapSize = "1g"
 }

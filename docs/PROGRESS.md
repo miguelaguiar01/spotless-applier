@@ -9,11 +9,29 @@ Running log of phase status. Newest entries at the top of each section.
 | 0     | Recon and design                        | done (checkpoint confirmed 2026-11-10) |
 | 1     | Worker skeleton and IPC                 | **done** |
 | 2     | Maven config extraction (IDE side)      | **done** |
-| 3     | Worker, Maven mode (core + parity)      | **core done**, parity corpus in progress |
+| 3     | Worker, Maven mode (core + parity)      | **done** (7/7 parity fixtures byte-identical) |
 | 4     | IDE integration                         | not started |
 | 5     | Gradle support                          | not started |
 | 6     | Fallback path hardening                 | not started |
 | 7     | Polish and release                      | not started |
+
+## Phase 3 — parity corpus (2026-11-10)
+
+`fixtures/maven/*` + `MavenParityTest`: each fixture is copied twice; a real
+Apache Maven 3.10.0 (downloaded by Gradle as `org.apache.maven:apache-maven:bin@zip`)
+runs `spotless:apply` on one copy, the native engine formats the original
+content of every file in the other, and results must be byte-identical
+(Maven-unchanged files must come back `CLEAN` or `NOT_COVERED`). All 7 pass:
+
+| fixture    | Spotless | steps |
+|------------|----------|-------|
+| gjf-full   | 3.11.0   | toggleOffOn, licenseHeader(file, `${project.basedir}`), removeUnusedImports, importOrder, googleJavaFormat(reflow, `${gjf.version}`), formatAnnotations; `<formats>` with includes/excludes, trimTrailingWhitespace, endWithNewline, indent |
+| palantir   | 3.10.4   | palantirJavaFormat, removeUnusedImports, licenseHeader(content), `<pom><sortPom>`, `lineEndings=UNIX` |
+| eclipse    | 3.11.0   | eclipse JDT with settings file (P2 provisioning) |
+| ktfmt      | 3.11.0   | kotlin ktfmt + licenseHeader |
+| generic    | 2.44.5   | formats: trim/endWithNewline/indent(tabs)/replaceRegex; json gson (previous major) |
+| prettier   | 3.11.0   | prettier 3.3.3 via npm with config (skipped when npm is absent) |
+| ratchet    | 3.11.0   | ratchetFrom=main (JGit-created repo, edits overlaid) + googleJavaFormat + licenseHeader |
 
 ## Phase 3 — what was done so far (2026-11-10)
 

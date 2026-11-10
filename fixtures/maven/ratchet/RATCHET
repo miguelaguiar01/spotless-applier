@@ -1,0 +1,1 @@
+RATCHET fixture: the test commits the tree on branch main, then overlays _edits/ before formatting.

@@ -1,0 +1,4 @@
+/*
+ * Copyright (C) $YEAR Example Corp.
+ * Licensed under the MIT license.
+ */
