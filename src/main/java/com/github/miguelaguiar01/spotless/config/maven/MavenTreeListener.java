@@ -40,12 +40,16 @@ public final class MavenTreeListener implements MavenProjectsTree.Listener {
         if (!changed.isEmpty()) onChanged.accept(changed);
     }
 
-    @Override
+    // No @Override on the next two: they exist (and are called) on 2026.1, but 2026.3 removed
+    // projectResolved(Pair) and deprecated pluginsResolved(MavenProject). Without the annotation the
+    // source compiles against either IDE; where the platform still declares the method, this still
+    // overrides it. On newer IDEs projectsUpdated and MavenImportListener.importFinished cover it.
+    @SuppressWarnings("unused")
     public void projectResolved(@NotNull Pair<MavenProject, MavenProjectChanges> projectWithChanges) {
         onChanged.accept(List.of(projectWithChanges.first));
     }
 
-    @Override
+    @SuppressWarnings("unused")
     public void pluginsResolved(@NotNull MavenProject project) {
         onChanged.accept(List.of(project));
     }
