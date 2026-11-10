@@ -43,6 +43,7 @@ dependencies {
         plugins(providers.gradleProperty("platformPlugins").map { it.split(',').filter(String::isNotBlank) })
         bundledModules(providers.gradleProperty("platformBundledModules").map { it.split(',').filter(String::isNotBlank) })
         testFramework(TestFrameworkType.Platform)
+        testFramework(TestFrameworkType.Plugin.Maven)
     }
 
     testImplementation("junit:junit:4.13.2")

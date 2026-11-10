@@ -8,6 +8,10 @@
     <depends>com.intellij.modules.java</depends>
     <depends>org.jetbrains.idea.maven</depends>
     <depends>com.intellij.gradle</depends>
+    <!-- Not used directly. The Maven plugin's content modules need these; declaring them optional
+         makes the test IDE load them, while real IDEs always have them bundled anyway. -->
+    <depends optional="true" config-file="spotless-properties-support.xml">com.intellij.properties</depends>
+    <depends optional="true" config-file="spotless-reposearch-support.xml">org.jetbrains.idea.reposearch</depends>
 
     <extensions defaultExtensionNs="com.intellij">
         <notificationGroup displayType="BALLOON" id="Spotless Applier Native"/>

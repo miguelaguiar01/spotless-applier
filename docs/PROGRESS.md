@@ -8,12 +8,38 @@ Running log of phase status. Newest entries at the top of each section.
 |-------|-----------------------------------------|-------------|
 | 0     | Recon and design                        | done (checkpoint confirmed 2026-11-10) |
 | 1     | Worker skeleton and IPC                 | **done** |
-| 2     | Maven config extraction (IDE side)      | not started |
+| 2     | Maven config extraction (IDE side)      | **done** |
 | 3     | Worker, Maven mode (core + parity)      | not started |
 | 4     | IDE integration                         | not started |
 | 5     | Gradle support                          | not started |
 | 6     | Fallback path hardening                 | not started |
 | 7     | Polish and release                      | not started |
+
+## Phase 2 — what was done (2026-11-10)
+
+- `MavenSpotlessConfigExtractor`: finds `spotless-maven-plugin` in IntelliJ's
+  effective `MavenProject` model (inherited/pluginManagement included),
+  merges plugin-level `<configuration>` with the `default-cli` execution
+  using a JDOM port of Maven's `Xpp3Dom.mergeXpp3Dom` (`XmlMerge`, incl.
+  `combine.self/children/id/keys`), interpolates leftover `${...}` from
+  project properties + built-ins (`project.basedir`, `project.build.directory`,
+  `settings.localRepository`, env, system), and captures source roots,
+  plugin repositories, effective local repo / settings files and offline
+  mode into `SpotlessConfig`. Versions below 2.44.0 → `SPOTLESS_VERSION_UNSUPPORTED`.
+- `SpotlessConfigService` (project service): caches per module, listens to
+  `MavenProjectsTree.Listener` and `MavenImportListener`, re-extracts on
+  import and invalidates only configIds that changed in the worker.
+- Tests: 5 `XmlMerge`/interpolation unit tests; 6 `MavenImportingTestCase`
+  tests importing fixture POMs through IntelliJ's real importer (single
+  module with placeholders, parent inheritance, pluginManagement,
+  default-cli vs phase-bound executions, no plugin / old version, service
+  cache refresh on re-import). Placeholders come back resolved.
+- Gotchas recorded: the test IDE only loads bundled plugins our descriptor
+  depends on, and the Maven plugin needs `com.intellij.properties` and
+  `org.jetbrains.idea.reposearch` → declared as optional dependencies
+  (ADR-017). Maven import tests must run off the EDT
+  (`runInDispatchThread() = false`). `MavenId` lives in the reposearch
+  plugin and is not referenced.
 
 ## Phase 1 — what was done (2026-11-10)
 
@@ -116,13 +142,11 @@ Running log of phase status. Newest entries at the top of each section.
   blocked; we pass explicit `--add-opens/--add-exports` (ADR-014). Needs a
   test on the bundled JBR 25.
 
-## Next steps (Phase 2)
+## Next steps (Phase 3)
 
-- `MavenConfigExtractor`: find `spotless-maven-plugin` in the module's
-  `MavenProject`, merge plugin-level config with `default-cli`, capture
-  properties, source roots, repositories, settings and local repo into
-  `SpotlessConfig`.
-- Settle the interpolation question with a fixture (see risks).
-- Invalidate on `MavenImportListener.importFinished` / POM changes.
-- Light tests with fixture POMs (single module, parent config,
-  pluginManagement, placeholders).
+- Worker: Maven Resolver (supplier-mvn3) with settings.xml, resolve the
+  plugin classpath per version, child-first classloader, adapter module
+  compiled against the Spotless Maven plugin API that configures
+  `SpotlessApplyMojo` via Plexus and builds Formatters; `DirtyState`-based
+  format; includes/excludes → `NOT_COVERED`.
+- Parity corpus + golden files generated with a real Maven.

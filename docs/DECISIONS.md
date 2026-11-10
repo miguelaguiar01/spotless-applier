@@ -304,3 +304,16 @@ not pull Gson/Jackson into the worker (which later hosts arbitrary Spotless
 classpaths), and the messages are small. Java records give typed messages;
 `SpotlessConfig.configId()` is the SHA-256 of the canonical (sorted-key)
 JSON.
+
+## ADR-017: Test IDE plugin loading
+
+Status: accepted
+
+The IntelliJ test framework loads only the bundled plugins the plugin under
+test depends on. The Maven plugin (`org.jetbrains.idea.maven`) has content
+modules provided by `com.intellij.properties` and
+`org.jetbrains.idea.reposearch`; without them it silently fails to load and
+Maven tests die with "Missing extension point". Both are declared as
+*optional* dependencies with empty config files so tests load them while the
+plugin keeps no hard requirement (every IDEA has them bundled anyway). The
+`MavenId` class lives in the reposearch plugin and is deliberately not used.
