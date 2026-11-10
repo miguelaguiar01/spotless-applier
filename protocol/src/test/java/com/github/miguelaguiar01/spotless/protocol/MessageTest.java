@@ -35,7 +35,7 @@ class MessageTest {
                 new Message.Invalidate("5", "abc"),
                 new Message.Format("6", "abc", "/p/A.java", "class A{}\n"),
                 new Message.FormatResult("6", FormatStatus.FORMATTED, "class A {}\n", null,
-                        List.of(new Message.Lint("step", 3, "lint"))),
+                        List.of(new Message.Lint("step", 3, "lint")), "\r\n"),
                 Message.FormatResult.clean("7"), Message.FormatResult.error("8", "bad"),
                 new Message.Cancel("9"));
         for (Message m : all) {

@@ -182,6 +182,7 @@ public final class MavenAdapterImpl implements MavenAdapter {
 
         String current = unixText;
         List<Message.Lint> lints = new ArrayList<>();
+        String lineEnding = lineEndingFor(matching.get(matching.size() - 1).formatter(), target);
         for (Entry entry : matching) {
             Formatter formatter = entry.formatter();
             Charset charset = formatter.getEncoding();
@@ -195,7 +196,7 @@ public final class MavenAdapterImpl implements MavenAdapter {
             if (dirty.didNotConverge()) {
                 return new Message.FormatResult(requestId, FormatStatus.DID_NOT_CONVERGE, null,
                         entry.name() + " did not converge on " + relative
-                                + " (see https://github.com/diffplug/spotless/blob/main/PADDEDCELL.md)", lints);
+                                + " (see https://github.com/diffplug/spotless/blob/main/PADDEDCELL.md)", lints, lineEnding);
             }
             if (!dirty.isClean()) {
                 ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -204,14 +205,23 @@ public final class MavenAdapterImpl implements MavenAdapter {
             }
         }
         if (current.equals(unixText)) {
-            return new Message.FormatResult(requestId, FormatStatus.CLEAN, null, null, lints);
+            return new Message.FormatResult(requestId, FormatStatus.CLEAN, null, null, lints, lineEnding);
         }
-        return new Message.FormatResult(requestId, FormatStatus.FORMATTED, current, null, lints);
+        return new Message.FormatResult(requestId, FormatStatus.FORMATTED, current, null, lints, lineEnding);
     }
 
     @Override
     public void close() throws Exception {
         closeAll();
+    }
+
+    private String lineEndingFor(Formatter formatter, File target) {
+        try {
+            return formatter.getLineEndingsPolicy().getEndingFor(target);
+        } catch (RuntimeException e) {
+            request.log().accept("Could not determine line ending for " + target + ": " + e.getMessage());
+            return null;
+        }
     }
 
     // ------------------------------------------------------------------ wiring helpers

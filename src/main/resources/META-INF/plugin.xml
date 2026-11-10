@@ -17,5 +17,43 @@
         <notificationGroup displayType="BALLOON" id="Spotless Applier Native"/>
         <applicationService
                 serviceImplementation="com.github.miguelaguiar01.spotless.settings.SpotlessApplierSettings"/>
+        <applicationConfigurable parentId="tools"
+                                 id="com.github.miguelaguiar01.spotless.ui.SpotlessSettingsConfigurable"
+                                 instance="com.github.miguelaguiar01.spotless.ui.SpotlessSettingsConfigurable"
+                                 displayName="Spotless Applier Native"/>
+
+        <actionOnSaveInfoProvider id="SpotlessNativeOnSaveInfoProvider"
+                                  implementation="com.github.miguelaguiar01.spotless.onsave.SpotlessOnSaveInfoProvider"
+                                  order="after FormatOnSaveInfoProvider, before BuildOnSaveInfoProvider"/>
+        <actionOnSave id="SpotlessNativeActionOnSave"
+                      implementation="com.github.miguelaguiar01.spotless.actions.ReformatActionOnSave"
+                      order="after FormatOnSaveAction"/>
+        <postStartupActivity implementation="com.github.miguelaguiar01.spotless.startup.SpotlessStartupActivity"/>
+
+        <!-- Opt-in (settings): Spotless behind Code | Reformat Code. canFormat() returns false unless enabled. -->
+        <formattingService implementation="com.github.miguelaguiar01.spotless.format.SpotlessFormattingService"/>
     </extensions>
+
+    <extensionPoints>
+        <extensionPoint name="formatOnSaveOptions.spotlessProvider"
+                        interface="com.github.miguelaguiar01.spotless.onsave.SpotlessOnSaveOptionsBase$DefaultsProvider"
+                        dynamic="true"/>
+    </extensionPoints>
+
+    <actions>
+        <action id="com.github.miguelaguiar01.spotless.actions.ReformatFileAction"
+                class="com.github.miguelaguiar01.spotless.actions.ReformatFileAction"
+                text="Reformat File With Spotless"
+                description="Reformat the current file with Spotless">
+            <add-to-group group-id="CodeFormatGroup" relative-to-action="ReformatCode" anchor="before"/>
+            <keyboard-shortcut first-keystroke="control alt SEMICOLON" keymap="$default"/>
+        </action>
+        <action id="com.github.miguelaguiar01.spotless.actions.ReformatProjectAction"
+                class="com.github.miguelaguiar01.spotless.actions.ReformatProjectAction"
+                text="Reformat Project With Spotless"
+                description="Reformat the project or selected modules with Spotless">
+            <add-to-group group-id="CodeFormatGroup" relative-to-action="ReformatCode" anchor="before"/>
+            <keyboard-shortcut first-keystroke="control alt shift SEMICOLON" keymap="$default"/>
+        </action>
+    </actions>
 </idea-plugin>

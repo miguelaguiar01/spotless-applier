@@ -35,6 +35,9 @@ class SpotlessApplierSettings : PersistentStateComponent<SpotlessApplierSettings
     /** Show a notification (once per project) explaining why the build tool was used instead. */
     @JvmField var showFallbackReasons: Boolean = true
 
+    /** Register Spotless as the formatter behind Code | Reformat Code for covered files. */
+    @JvmField var integrateWithReformatCode: Boolean = false
+
     // Carried over from the original plugin.
     @JvmField var optimizeImportsBeforeApplying: Boolean = false
     @JvmField var prohibitImportsWithAsterisk: Boolean = false

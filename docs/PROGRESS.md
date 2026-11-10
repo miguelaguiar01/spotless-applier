@@ -10,10 +10,45 @@ Running log of phase status. Newest entries at the top of each section.
 | 1     | Worker skeleton and IPC                 | **done** |
 | 2     | Maven config extraction (IDE side)      | **done** |
 | 3     | Worker, Maven mode (core + parity)      | **done** (7/7 parity fixtures byte-identical) |
-| 4     | IDE integration                         | not started |
+| 4     | IDE integration                         | **done** (benchmarks pending) |
 | 5     | Gradle support                          | not started |
 | 6     | Fallback path hardening                 | not started |
 | 7     | Polish and release                      | not started |
+
+## Phase 4 — what was done (2026-11-10)
+
+- `FormatService` (project service): native path = config lookup →
+  worker → one undoable `writeCommandAction` that replaces only the differing
+  middle range (caret/folds outside survive); `CLEAN` never touches the
+  document; `NOT_COVERED` / `DID_NOT_CONVERGE` / `ERROR` / lints reported;
+  every "can't" returns `FellBack(reason, detail)` and callers run the
+  build-tool engine. Remote (ijent) files fall back in this version.
+- Build-tool engine: the original plugin's `ReformatProcessor`,
+  `TaskUnderProgress`, `ToolEnvExternalSystemUtil`, `ModuleInfo`, `BuildTool`
+  ported verbatim (package rename, settings class) under `buildtool/`;
+  optimize-imports (`SynchronousOptimizeImportsProcessor`), on-save options
+  UI and module-selection dialog ported likewise.
+- Actions: `ReformatFileAction` (optimize imports on EDT, then background
+  native format, fallback on EDT), `ReformatProjectAction` (module dialog as
+  before; `ProjectFormatter` streams candidate files with parallelism 4 under
+  a cancellable background progress, edits open documents, writes others
+  with the policy's line ending, refreshes VFS; modules without native config
+  go to the build tool), `ReformatActionOnSave` now implements
+  `DocumentUpdatingActionOnSave` (cancellable, off-EDT) with the same
+  file-type selection UI.
+- Settings UI (Kotlin UI DSL): Engine, show fallback reasons, pre-warm,
+  Reformat Code integration (opt-in), worker JDK/idle timeout/heap,
+  optimize imports (+asterisk), Gradle configuration-cache flag.
+- `SpotlessFormattingService` (`AsyncDocumentFormattingService`): opt-in via
+  settings; `canFormat` only for files with a native config.
+- `SpotlessNotifications`: status-bar successes, balloon errors, fallback
+  reason once per project with a "Don't show" action.
+- Startup: on-save options warm-up off EDT (original ijent fix) + optional
+  pre-warm of every Maven module's config.
+- Tests: `FormatServiceTest` (minimal replacement keeps caret, one undo
+  restores, CLEAN leaves the document untouched).
+- Not done yet: `docs/BENCHMARKS.md` numbers (needs an interactive `runIde`
+  session or a scripted measurement; worker-side timings are logged).
 
 ## Phase 3 — parity corpus (2026-11-10)
 
@@ -182,11 +217,9 @@ content of every file in the other, and results must be byte-identical
   blocked; we pass explicit `--add-opens/--add-exports` (ADR-014). Needs a
   test on the bundled JBR 25.
 
-## Next steps (Phase 3)
+## Next steps
 
-- Worker: Maven Resolver (supplier-mvn3) with settings.xml, resolve the
-  plugin classpath per version, child-first classloader, adapter module
-  compiled against the Spotless Maven plugin API that configures
-  `SpotlessApplyMojo` via Plexus and builds Formatters; `DirtyState`-based
-  format; includes/excludes → `NOT_COVERED`.
-- Parity corpus + golden files generated with a real Maven.
+- Phase 5: Gradle sync-time model builder + worker Gradle mode (allow-list).
+- Phase 6: mvnd-safe fallback (`-DspotlessFiles`), Eel-spawned worker for
+  Dev Containers.
+- Phase 7: benchmarks, README, CHANGELOG, CI, plugin verifier, checkpoint.

@@ -253,7 +253,11 @@ public sealed interface Message {
         }
     }
 
-    record FormatResult(String id, FormatStatus status, String text, String message, List<Lint> lints)
+    /**
+     * {@code text} always uses {@code \n}; {@code lineEnding} is the separator the formatter's
+     * line-ending policy would write for this file ({@code "\n"}, {@code "\r\n"}, …) or null if unknown.
+     */
+    record FormatResult(String id, FormatStatus status, String text, String message, List<Lint> lints, String lineEnding)
             implements Message {
         public static final String TYPE = "formatResult";
 
@@ -271,19 +275,24 @@ public sealed interface Message {
             List<Object> ls = new ArrayList<>();
             for (Lint l : lints) ls.add(l.toJson());
             m.put("lints", ls);
+            m.put("lineEnding", lineEnding);
             return m;
         }
 
+        public FormatResult(String id, FormatStatus status, String text, String message, List<Lint> lints) {
+            this(id, status, text, message, lints, null);
+        }
+
         public static FormatResult clean(String id) {
-            return new FormatResult(id, FormatStatus.CLEAN, null, null, List.of());
+            return new FormatResult(id, FormatStatus.CLEAN, null, null, List.of(), null);
         }
 
         public static FormatResult formatted(String id, String text, List<Lint> lints) {
-            return new FormatResult(id, FormatStatus.FORMATTED, text, null, lints);
+            return new FormatResult(id, FormatStatus.FORMATTED, text, null, lints, null);
         }
 
         public static FormatResult error(String id, String message) {
-            return new FormatResult(id, FormatStatus.ERROR, null, message, List.of());
+            return new FormatResult(id, FormatStatus.ERROR, null, message, List.of(), null);
         }
     }
 
@@ -353,7 +362,7 @@ public sealed interface Message {
                 List<Lint> lints = new ArrayList<>();
                 for (Object o : Json.list(m, "lints")) lints.add(Lint.fromJson((Map<String, Object>) o));
                 return new FormatResult(id, FormatStatus.valueOf(Json.requireStr(m, "status")), Json.str(m, "text"),
-                        Json.str(m, "message"), lints);
+                        Json.str(m, "message"), lints, Json.str(m, "lineEnding"));
             }
             case Cancel.TYPE:
                 return new Cancel(id);
