@@ -77,7 +77,7 @@ object WorkerJdkResolver {
         list += "Maven runner JRE" to safely { mavenRunnerJdk(project) }
         list += "Gradle JVM" to safely { gradleJvm(project) }
         list += "project SDK" to safely { projectSdk(project) }
-        list += safely { target.extraJdkCandidates() } ?: emptyList()
+        list += safely { target.extraJdkCandidates(project) } ?: emptyList()
         if (target.ideRuntimeIsCandidate) list += "IDE runtime" to System.getProperty("java.home")
         return list
     }

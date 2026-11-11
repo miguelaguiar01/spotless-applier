@@ -2,6 +2,7 @@ package com.github.miguelaguiar01.spotless.worker
 
 import com.github.miguelaguiar01.spotless.protocol.SpotlessConfig
 import com.intellij.execution.configurations.GeneralCommandLine
+import com.intellij.execution.process.CapturingProcessHandler
 import com.intellij.execution.wsl.WSLCommandLineOptions
 import com.intellij.execution.wsl.WSLDistribution
 import com.intellij.execution.wsl.WslDistributionManager
@@ -35,7 +36,7 @@ sealed interface WorkerTarget {
     fun acceptsJdk(home: Path): Boolean
 
     /** Extra JDK candidates (IDE-side paths) specific to this target, after the usual ones. */
-    fun extraJdkCandidates(): List<Pair<String, String?>>
+    fun extraJdkCandidates(project: Project): List<Pair<String, String?>>
 
     /** Whether the IDE's own runtime is a candidate (never for a remote target). */
     val ideRuntimeIsCandidate: Boolean
@@ -72,7 +73,7 @@ object LocalTarget : WorkerTarget {
     override fun toHostPath(workerPath: String) = workerPath
     override fun mapConfig(config: SpotlessConfig) = config
     override fun acceptsJdk(home: Path) = true
-    override fun extraJdkCandidates(): List<Pair<String, String?>> = emptyList()
+    override fun extraJdkCandidates(project: Project): List<Pair<String, String?>> = emptyList()
     override val ideRuntimeIsCandidate = true
     override fun javaExecutable(jdk: WorkerJdk): String = jdk.javaExecutable.toString()
     override fun finish(command: GeneralCommandLine, workingDirectory: Path, project: Project): GeneralCommandLine =
@@ -105,15 +106,33 @@ class WslTarget(val distribution: WSLDistribution, private val mapper: WslPathMa
 
     override fun acceptsJdk(home: Path): Boolean = mapper.isWslPath(home.toString())
 
-    override fun extraJdkCandidates(): List<Pair<String, String?>> {
-        val javaHome = runCatching { distribution.getEnvironmentVariable("JAVA_HOME") }.getOrNull()
-            ?.takeIf { it.isNotBlank() }
-        return listOf("JAVA_HOME in ${distribution.msId}" to javaHome?.let { toHostPath(it) })
+    override fun extraJdkCandidates(project: Project): List<Pair<String, String?>> {
+        val javaHome = probe(project, "printenv JAVA_HOME")
+        val javaOnPath = probe(project, "readlink -f \"$(command -v java)\"")
+            ?.removeSuffix("/bin/java")?.takeIf { it.startsWith("/") }
+        return listOf(
+            "JAVA_HOME in ${distribution.msId}" to javaHome?.let { toHostPath(it) },
+            "java on PATH in ${distribution.msId}" to javaOnPath?.let { toHostPath(it) },
+        )
     }
+
+    /** Runs a short shell command in the distribution (login shell, so SDKMAN/mise-style setups apply). */
+    private fun probe(project: Project, script: String): String? = runCatching {
+        val cmd = GeneralCommandLine("sh", "-c", script)
+        val patched = distribution.patchCommandLine(cmd, project, WSLCommandLineOptions().setLaunchWithWslExe(true))
+        val out = CapturingProcessHandler(patched).runProcess(PROBE_TIMEOUT_MS)
+        if (out.exitCode != 0 || out.isTimeout) null
+        else out.stdout.lineSequence().map { it.trim() }.firstOrNull { it.isNotEmpty() }
+    }.onFailure { LOG.debug("WSL probe '$script' failed", it) }.getOrNull()
 
     override val ideRuntimeIsCandidate = false
 
     override fun javaExecutable(jdk: WorkerJdk): String = toWorkerPath(jdk.home.toString()).trimEnd('/') + "/bin/java"
+
+    private companion object {
+        private val LOG = logger<WslTarget>()
+        private const val PROBE_TIMEOUT_MS = 20_000
+    }
 
     override fun finish(command: GeneralCommandLine, workingDirectory: Path, project: Project): GeneralCommandLine {
         // No Windows working directory: wsl.exe cannot be started in a UNC directory.
