@@ -84,6 +84,15 @@ Other known gaps: Gradle target sets are captured at sync time (new files need a
 falls back for them); `spotlessSetLicenseHeaderYearsFromGitHistory` is a command-line property and
 is not set; lints (Spotless 3.x) are shown as an error notification but formatting is still applied.
 
+## Projects inside WSL (Windows)
+
+When the project lives in a WSL distribution (`\\wsl.localhost\<distro>\...`), the worker runs
+*inside* that distribution via `wsl.exe`, with a Linux JDK found there: the Maven runner JRE, the
+Gradle JVM, the project SDK, or the distribution's `JAVA_HOME`. You can also point "JDK home" in the
+settings at a Linux path such as `/home/you/.sdkman/candidates/java/21`. The plugin's jars are read
+through `/mnt/<drive>/...`, so the first start of a worker is slower than on a local project.
+Dev Containers and other remote projects still use the build tool.
+
 ## Troubleshooting
 
 - Enable debug logging: `Help` > `Diagnostic Tools` > `Debug Log Settings` →

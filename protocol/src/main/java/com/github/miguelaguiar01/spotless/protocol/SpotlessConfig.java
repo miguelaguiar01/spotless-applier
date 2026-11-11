@@ -8,6 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.UnaryOperator;
 
 /**
  * Everything the worker needs to build Formatters for one module, extracted on the IDE side.
@@ -181,6 +182,49 @@ public record SpotlessConfig(
                 maven == null ? null : Maven.fromJson(maven),
                 gradle == null ? null : Gradle.fromJson(gradle),
                 extra == null ? Map.of() : extra);
+    }
+
+    /**
+     * Copy with every path translated for a worker that sees the file system differently (e.g. a
+     * WSL distribution). {@code path} converts whole-string paths, {@code text} converts paths
+     * embedded in free text (the Maven configuration XML). Non-path strings pass through unchanged.
+     */
+    public SpotlessConfig mapPaths(UnaryOperator<String> path, UnaryOperator<String> text) {
+        Maven m = maven == null ? null : new Maven(
+                text.apply(maven.configurationXml()),
+                mapValues(maven.properties(), path),
+                mapAll(maven.sourceRoots(), path),
+                mapAll(maven.testSourceRoots(), path),
+                maven.pluginRepositories(),
+                maven.localRepository() == null ? null : path.apply(maven.localRepository()),
+                maven.userSettingsFile() == null ? null : path.apply(maven.userSettingsFile()),
+                maven.globalSettingsFile() == null ? null : path.apply(maven.globalSettingsFile()),
+                maven.offline());
+        Gradle g = null;
+        if (gradle != null) {
+            List<GradleFormat> formats = new ArrayList<>();
+            for (GradleFormat f : gradle.formats()) {
+                formats.add(new GradleFormat(f.name(), f.taskName(), f.stepsBase64(), f.lineEndingPolicyBase64(),
+                        f.encoding(), mapAll(f.targetFiles(), path), f.ratchetFrom(), f.fallbackReason()));
+            }
+            g = new Gradle(mapAll(gradle.classpath(), path), formats);
+        }
+        return new SpotlessConfig(kind, spotlessVersion, path.apply(projectDir),
+                buildDir == null ? null : path.apply(buildDir), m, g, extra);
+    }
+
+    private static List<String> mapAll(List<String> values, UnaryOperator<String> f) {
+        if (values == null) return null;
+        List<String> out = new ArrayList<>(values.size());
+        for (String v : values) out.add(v == null ? null : f.apply(v));
+        return out;
+    }
+
+    private static Map<String, String> mapValues(Map<String, String> values, UnaryOperator<String> f) {
+        if (values == null) return null;
+        Map<String, String> out = new LinkedHashMap<>();
+        for (Map.Entry<String, String> e : values.entrySet()) out.put(e.getKey(), e.getValue() == null ? null : f.apply(e.getValue()));
+        return out;
     }
 
     /** Stable content hash: the cache key for Formatters in the worker and for the IDE-side cache. */

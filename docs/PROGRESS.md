@@ -67,6 +67,13 @@ Running log of phase status. Newest entries at the top of each section.
   metadata (compiler moved to 2.4.21, apiVersion pinned 2.2) and Java 25 class files
   (`-PbuildJdk=25`, output still Java 21); `MavenProjectsTree.Listener.projectResolved(Pair)` no
   longer exists on 2026.3 (overridden without `@Override`).
+- **2026-11-11, WSL support (ADR-022):** the work laptop's log showed every format had gone through
+  the `mvn` fallback: the project lives in WSL, the Maven runner JRE is a Linux JDK, and the worker
+  was started as a Windows process (`WORKER_UNAVAILABLE`). Added `WorkerTarget` (`LocalTarget` /
+  `WslTarget`): worker launched inside the distribution via `WSLDistribution.patchCommandLine`,
+  JDK candidates filtered to the distribution, `SpotlessConfig.mapPaths` + `WslPathMapper` for
+  path translation, Gradle target sets mapped back for VFS lookups. Unit-tested mapper/config
+  mapping; the launch itself is verified by the user on Windows (cannot run here).
 - **Real-world check (2026-11-10 night):** plugin built against 2026.3 installed in the user's
   work IntelliJ 2026.3; native formatting works on a corporate Maven project ("It works!").
 - Windows paths (parity ran on macOS only).

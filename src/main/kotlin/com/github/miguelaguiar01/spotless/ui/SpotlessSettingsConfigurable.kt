@@ -49,7 +49,7 @@ class SpotlessSettingsConfigurable : BoundConfigurable("Spotless Applier Native"
                     textFieldWithBrowseButton(FileChooserDescriptorFactory.createSingleFolderDescriptor().withTitle("Select JDK Home"))
                         .bindText(s::workerJdkHome)
                         .columns(40)
-                        .comment("Leave empty to use the Maven runner JRE, the Gradle JVM, the project SDK or the IDE runtime (in that order). Java 17+ is required for Spotless 3.x.")
+                        .comment("Leave empty to use the Maven runner JRE, the Gradle JVM, the project SDK or the IDE runtime (in that order). Java 17+ is required for Spotless 3.x. For a project inside WSL, a Linux path such as /home/you/jdk-21 selects a JDK inside the distribution.")
                 }
                 row("Idle timeout (minutes):") {
                     intTextField(0..1440).bindIntText(s::workerIdleTimeoutMinutes).comment("0 keeps the worker alive until the project is closed.")

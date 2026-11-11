@@ -4,6 +4,18 @@
 
 ## [Unreleased]
 
+### Added
+
+- Projects inside WSL: the worker now runs inside the distribution (`wsl.exe`), with a Linux JDK
+  and translated paths, instead of falling back to the build tool (ADR-022).
+- `-PplatformLocalPath` / `-PbuildJdk` build options for networks that block JetBrains' hosts.
+
+### Fixed
+
+- 2026.2+: a Kotlin-generated stub for a removed `MavenProjectsTree.Listener` default could throw
+  `NoSuchMethodError`; the listener is now a Java class (ADR-021).
+- Worker stderr lines are logged with the level slf4j printed, instead of always as warnings.
+
 ## [0.1.0] - 2026-11-10
 
 ### Added

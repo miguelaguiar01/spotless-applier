@@ -417,3 +417,34 @@ such stubs; the audit is cheap and should be repeated whenever a new platform li
 **Also.** `PluginManagerCore.getPlugin` is `@ApiStatus.Internal`; the worker directory lookup now
 uses `PluginManager.getInstance().findEnabledPlugin(id)`.
 
+## ADR-022: Projects inside WSL run the worker inside the distribution
+
+**Status:** accepted (2026-11-11, after the first real-world use at the user's workplace)
+
+**Context.** On Windows with the project in a WSL distribution (`\\wsl.localhost\<distro>\...`),
+the IDE sees ordinary paths and the Eel descriptor of such a file is still the local one, so the
+plugin tried to start the worker as a Windows process using the Maven runner JRE, which is a
+*Linux* JDK inside the distribution. That cannot start, and every format went through the
+`mvn` fallback (reason `WORKER_UNAVAILABLE`), silently after the first notification.
+
+**Decision.** A `WorkerTarget` abstraction decides where the worker runs, chosen once per project
+from its base path:
+- `LocalTarget`: unchanged behaviour.
+- `WslTarget`: the worker is started inside the distribution through the platform's stable WSL
+  API (`WSLDistribution.patchCommandLine`, i.e. `wsl.exe`), using a JDK that lives inside the
+  distribution (Maven runner JRE, Gradle JVM, project SDK or the distribution's `JAVA_HOME`;
+  Windows JDKs and the IDE runtime are rejected). The plugin's worker jars and the resolved-classpath
+  cache are reached through `/mnt/<drive>/...`; every path in the `SpotlessConfig`
+  (`SpotlessConfig.mapPaths`) and in each format request is translated to its Linux form by
+  `WslPathMapper`; worker-side paths (Gradle target sets) are translated back for VFS lookups.
+  The IDE-side config cache keeps IDE paths and ids; `WorkerManager` owns the mapping.
+- The stdio-framed protocol is unchanged: `wsl.exe` relays the Linux process's stdin/stdout bytes.
+
+**Not covered.** Dev Containers and other Eel-backed remotes still fall back to the build tool
+(`NOT_IMPLEMENTED`); they would need the Eel exec API rather than `wsl.exe`. Reading the worker
+jars through `/mnt/c` makes the first start slower than local; copying them into the distribution
+once is a possible follow-up.
+
+**Verification.** Unit tests for the mapper and the config mapping; the WSL launch itself cannot
+be exercised on macOS/CI and was verified on the user's Windows + WSL machine.
+

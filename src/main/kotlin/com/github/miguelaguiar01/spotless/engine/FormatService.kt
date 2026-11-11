@@ -10,6 +10,7 @@ import com.github.miguelaguiar01.spotless.protocol.SpotlessConfig
 import com.github.miguelaguiar01.spotless.settings.Engine
 import com.github.miguelaguiar01.spotless.settings.SpotlessApplierSettings
 import com.github.miguelaguiar01.spotless.worker.WorkerManager
+import com.github.miguelaguiar01.spotless.worker.WslPathMapper
 import com.github.miguelaguiar01.spotless.worker.WorkerUnavailableException
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.readAction
@@ -99,11 +100,11 @@ class FormatService(private val project: Project, private val scope: CoroutineSc
                 FormatOutcome.Clean
             }
             FormatStatus.NOT_COVERED -> {
-                val info = WorkerManager.getInstance(project).loadedInfo(config.configId())
-                val realPath = runCatching { java.nio.file.Path.of(path).toRealPath().toString() }.getOrDefault(path)
-                if (info != null && (info.needsBuildTool(path) || info.needsBuildTool(realPath))) {
+                val manager = WorkerManager.getInstance(project)
+                if (manager.needsBuildTool(config, path)) {
+                    val names = manager.loadedInfo(config)?.fallbackFormats?.joinToString { it.name } ?: "?"
                     FormatOutcome.FellBack(FallbackReason.GRADLE_STEP_NOT_SERIALIZABLE,
-                        "$displayName belongs to a Spotless format the native engine cannot run (${info.fallbackFormats.joinToString { it.name }})")
+                        "$displayName belongs to a Spotless format the native engine cannot run ($names)")
                 } else {
                     notifications.statusBar("Spotless: $displayName is not covered by the Spotless configuration")
                     FormatOutcome.NotCovered
@@ -160,6 +161,8 @@ class FormatService(private val project: Project, private val scope: CoroutineSc
     }
 
     private fun isLocal(file: VirtualFile): Boolean {
+        // Files inside a WSL distribution are handled by WslTarget (the worker runs in the distribution).
+        if (WslPathMapper.distributionIdOf(file.path) != null) return true
         val nio = runCatching { file.toNioPath() }.getOrNull() ?: return true
         val descriptor = runCatching { nio.getEelDescriptor() }.getOrNull() ?: return true
         return descriptor == LocalEelDescriptor

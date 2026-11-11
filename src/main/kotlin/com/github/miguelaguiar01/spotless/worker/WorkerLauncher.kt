@@ -3,7 +3,7 @@ package com.github.miguelaguiar01.spotless.worker
 import com.github.miguelaguiar01.spotless.settings.SpotlessApplierSettings
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.openapi.application.PathManager
-import java.io.File
+import com.intellij.openapi.project.Project
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
@@ -62,26 +62,31 @@ object WorkerLauncher {
         return jars
     }
 
-    fun commandLine(jdk: WorkerJdk, workingDirectory: Path, settings: SpotlessApplierSettings): GeneralCommandLine {
+    fun commandLine(
+        jdk: WorkerJdk,
+        workingDirectory: Path,
+        settings: SpotlessApplierSettings,
+        project: Project,
+        target: WorkerTarget = LocalTarget,
+    ): GeneralCommandLine {
         val idleMs = settings.workerIdleTimeoutMinutes.coerceAtLeast(0) * 60_000L
-        return GeneralCommandLine()
-            .withExePath(jdk.javaExecutable.toString())
-            .withWorkDirectory(workingDirectory.toFile())
+        val classpath = workerClasspath().joinToString(target.classpathSeparator) { target.toWorkerPath(it.toString()) }
+        val cmd = GeneralCommandLine()
+            .withExePath(target.javaExecutable(jdk))
             .withCharset(StandardCharsets.UTF_8)
             .withParameters(JVM_FLAGS)
             .withParameters("-Xmx${settings.workerMaxHeapMb.coerceAtLeast(256)}m")
-            .withParameters("-cp", workerClasspath().joinToString(File.pathSeparator))
+            .withParameters("-cp", classpath)
             .withParameters(
                 MAIN_CLASS,
                 "--idle-timeout-ms=$idleMs",
                 "--log-level=INFO",
-                "--cache-dir=${cacheDirectory()}",
+                "--cache-dir=${target.toWorkerPath(cacheDirectory().toString())}",
             )
-            .also { cmd ->
-                // Keep user JVM options from hijacking stdout. Removing (not blanking) the variable also
-                // avoids the JVM's "Picked up JAVA_TOOL_OPTIONS:" banner on stderr.
-                cmd.environment.remove("JAVA_TOOL_OPTIONS")
-                cmd.environment.remove("_JAVA_OPTIONS")
-            }
+        // Keep user JVM options from hijacking stdout. Removing (not blanking) the variable also
+        // avoids the JVM's "Picked up JAVA_TOOL_OPTIONS:" banner on stderr.
+        cmd.environment.remove("JAVA_TOOL_OPTIONS")
+        cmd.environment.remove("_JAVA_OPTIONS")
+        return target.finish(cmd, workingDirectory, project)
     }
 }

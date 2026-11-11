@@ -37,11 +37,15 @@ class WorkerJdkUnavailableException(message: String) : RuntimeException(message)
 object WorkerJdkResolver {
     private val LOG = logger<WorkerJdkResolver>()
 
-    fun resolve(project: Project, minFeatureVersion: Int): WorkerJdk {
+    fun resolve(project: Project, minFeatureVersion: Int, target: WorkerTarget = LocalTarget): WorkerJdk {
         val rejected = mutableListOf<String>()
-        for ((source, home) in candidates(project)) {
+        for ((source, home) in candidates(project, target)) {
             if (home == null) continue
             val path = Path.of(home)
+            if (!target.acceptsJdk(path)) {
+                rejected += "$source: $home cannot run on the ${target.description}"
+                continue
+            }
             if (!Files.isDirectory(path)) {
                 rejected += "$source: $home does not exist"
                 continue
@@ -59,18 +63,22 @@ object WorkerJdkResolver {
             return WorkerJdk(path, version, source)
         }
         throw WorkerJdkUnavailableException(
-            "No JDK >= $minFeatureVersion found for the Spotless worker. Tried: ${rejected.joinToString("; ")}"
+            "No JDK >= $minFeatureVersion found for the Spotless worker on the ${target.description}. Tried: ${rejected.joinToString("; ")}"
         )
     }
 
-    private fun candidates(project: Project): List<Pair<String, String?>> {
+    private fun candidates(project: Project, target: WorkerTarget): List<Pair<String, String?>> {
         val list = mutableListOf<Pair<String, String?>>()
         val override = SpotlessApplierSettings.getInstance().workerJdkHome
-        if (override.isNotBlank()) list += "settings" to override
+        if (override.isNotBlank()) {
+            // A Linux path in the settings means "inside the target" for a remote target.
+            list += "settings" to if (override.startsWith("/") && target !is LocalTarget) target.toHostPath(override) else override
+        }
         list += "Maven runner JRE" to safely { mavenRunnerJdk(project) }
         list += "Gradle JVM" to safely { gradleJvm(project) }
         list += "project SDK" to safely { projectSdk(project) }
-        list += "IDE runtime" to System.getProperty("java.home")
+        list += safely { target.extraJdkCandidates() } ?: emptyList()
+        if (target.ideRuntimeIsCandidate) list += "IDE runtime" to System.getProperty("java.home")
         return list
     }
 

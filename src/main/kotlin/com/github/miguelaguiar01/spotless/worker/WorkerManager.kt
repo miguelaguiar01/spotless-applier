@@ -44,10 +44,32 @@ class WorkerManager(private val project: Project, private val scope: CoroutineSc
     /** Known configs, re-sent after a restart. */
     private val configs = ConcurrentHashMap<String, SpotlessConfig>()
 
-    /** Last successful load result per configId (fallback formats, format infos). */
+    /** Last successful load result per (worker-side) configId (fallback formats, format infos). */
     private val loadedInfo = ConcurrentHashMap<String, Message.ConfigLoaded>()
 
-    fun loadedInfo(configId: String): Message.ConfigLoaded? = loadedInfo[configId]
+    /** Where the worker runs (ADR-022); decided once per project from its base path. */
+    val target: WorkerTarget by lazy { WorkerTarget.forProject(project) }
+
+    /** IDE-side configId → config with paths translated for [target] (identity for the local target). */
+    private val workerConfigs = ConcurrentHashMap<String, SpotlessConfig>()
+
+    private fun workerConfig(config: SpotlessConfig): SpotlessConfig =
+        if (target is LocalTarget) config else workerConfigs.computeIfAbsent(config.configId()) { target.mapConfig(config) }
+
+    fun toWorkerPath(hostPath: String): String = target.toWorkerPath(hostPath)
+    fun toHostPath(workerPath: String): String = target.toHostPath(workerPath)
+
+    fun loadedInfo(config: SpotlessConfig): Message.ConfigLoaded? = loadedInfo[workerConfig(config).configId()]
+
+    /** True when [hostPath] is owned by a format the native engine cannot run (Gradle fallback formats). */
+    fun needsBuildTool(config: SpotlessConfig, hostPath: String): Boolean {
+        val info = loadedInfo(config) ?: return false
+        val workerPath = toWorkerPath(hostPath)
+        if (info.needsBuildTool(workerPath)) return true
+        if (target !is LocalTarget) return false
+        val real = runCatching { Path.of(hostPath).toRealPath().toString() }.getOrDefault(hostPath)
+        return real != hostPath && info.needsBuildTool(real)
+    }
 
     private var consecutiveFailures = 0
     private var lastFailure: TimeSource.Monotonic.ValueTimeMark? = null
@@ -74,26 +96,30 @@ class WorkerManager(private val project: Project, private val scope: CoroutineSc
     }
 
     suspend fun loadConfig(config: SpotlessConfig): Message.ConfigLoaded {
-        val conn = connected(config)
-        return load(conn, config)
+        val wc = workerConfig(config)
+        val conn = connected(wc)
+        return load(conn, wc)
     }
 
     /** Formats [text] under [config], loading the config first if this worker has not seen it. */
     suspend fun format(config: SpotlessConfig, path: String, text: String): Message.FormatResult {
-        val conn = connected(config)
-        val configId = config.configId()
+        val wc = workerConfig(config)
+        val conn = connected(wc)
+        val configId = wc.configId()
         if (!loaded.contains(configId)) {
-            val result = load(conn, config)
+            val result = load(conn, wc)
             if (!result.isOk) {
                 throw WorkerUnavailableException(result.fallbackReason ?: "WORKER_LOAD_FAILED", result.error ?: "config load failed")
             }
         }
-        val reply = conn.request(FORMAT_TIMEOUT) { Message.Format(it, configId, path, text) }
+        val reply = conn.request(FORMAT_TIMEOUT) { Message.Format(it, configId, toWorkerPath(path), text) }
         check(reply is Message.FormatResult) { "Expected formatResult, got ${reply.type()}" }
         return reply
     }
 
-    suspend fun invalidate(configId: String) {
+    /** [hostConfigId] is the IDE-side id (as computed by the config service). */
+    suspend fun invalidate(hostConfigId: String) {
+        val configId = workerConfigs.remove(hostConfigId)?.configId() ?: hostConfigId
         configs.remove(configId)
         loaded.remove(configId)
         loadedInfo.remove(configId)
@@ -107,6 +133,7 @@ class WorkerManager(private val project: Project, private val scope: CoroutineSc
 
     fun invalidateAll() {
         configs.clear()
+        workerConfigs.clear()
         loaded.clear()
         connection?.takeIf { it.isAlive }?.let { conn ->
             connection = null
@@ -182,14 +209,14 @@ class WorkerManager(private val project: Project, private val scope: CoroutineSc
     private suspend fun start(minJava: Int): WorkerConnection = withContext(Dispatchers.IO) {
         val settings = SpotlessApplierSettings.getInstance()
         val jdk = try {
-            WorkerJdkResolver.resolve(project, minJava)
+            WorkerJdkResolver.resolve(project, minJava, target)
         } catch (e: WorkerJdkUnavailableException) {
             throw WorkerUnavailableException("NO_SUITABLE_JDK", e.message ?: "no JDK", e)
         }
         val workDir = project.basePath?.let { Path.of(it) }?.takeIf { Files.isDirectory(it) }
             ?: Path.of(System.getProperty("user.home"))
-        val commandLine = WorkerLauncher.commandLine(jdk, workDir, settings)
-        LOG.info("Starting Spotless worker: ${commandLine.commandLineString}")
+        val commandLine = WorkerLauncher.commandLine(jdk, workDir, settings, project, target)
+        LOG.info("Starting Spotless worker on the ${target.description}: ${commandLine.commandLineString}")
         val process = commandLine.createProcess()
         val conn = WorkerConnection(process, WORKER_LOG) { dead ->
             LOG.info("Spotless worker ${dead.pid} is gone: ${dead.deathReason}")

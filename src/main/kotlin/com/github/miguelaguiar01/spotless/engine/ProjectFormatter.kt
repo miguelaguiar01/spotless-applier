@@ -86,7 +86,10 @@ class ProjectFormatter(private val project: Project) {
         }
         val root = Path.of(config.projectDir)
         val candidates = withContext(Dispatchers.IO) {
-            config.gradle?.let { g -> g.formats.filter { it.fallbackReason() == null }.flatMap { it.targetFiles() }.map(Path::of).distinct().sorted() }
+            config.gradle?.let { g ->
+                g.formats.filter { it.fallbackReason() == null }.flatMap { it.targetFiles() }
+                    .map { Path.of(worker.toHostPath(it)) }.distinct().sorted()
+            }
                 ?: collectCandidates(root, loaded.formats)
         }
         val summary = withBackgroundProgress(project, "Spotless: ${moduleInfo.module()?.name ?: root.fileName}", cancellable = true) {
