@@ -73,7 +73,12 @@ Running log of phase status. Newest entries at the top of each section.
   `WslTarget`): worker launched inside the distribution via `WSLDistribution.patchCommandLine`,
   JDK candidates filtered to the distribution, `SpotlessConfig.mapPaths` + `WslPathMapper` for
   path translation, Gradle target sets mapped back for VFS lookups. Unit-tested mapper/config
-  mapping; the launch itself is verified by the user on Windows (cannot run here).
+  mapping. **Verified on the user's Windows + WSL machine (2026-11-11 16:40):** worker started via
+  `wsl.exe` with the mise-installed Temurin 21, Maven resolver on `/home/<user>/.m2`, plugin
+  2.44.3 resolved in 411 ms, formatting reported as "very very fast". The earlier "it works" on
+  2026-11-10 had in fact been the `mvn` fallback (`WORKER_UNAVAILABLE`): the log, not the
+  impression, is the source of truth. CI run 43060327217 (commit 3136980): verifier compatible
+  on 261/262/263, no internal API usages.
 - **Real-world check (2026-11-10 night):** plugin built against 2026.3 installed in the user's
   work IntelliJ 2026.3; native formatting works on a corporate Maven project ("It works!").
 - Windows paths (parity ran on macOS only).
